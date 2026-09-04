@@ -1,14 +1,26 @@
-{
-  "name": "smile-ai",
-  "version": "1.0.0",
-  "description": "My personal AI chatbot backend",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^5.1.0",
-    "cors": "^2.8.5",
-    "openai": "^5.12.0"
-  }
-}
+const express = require("express");
+const cors = require("cors");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.json({
+    message: "Smile AI backend is running! 😊"
+  });
+});
+
+app.post("/chat", (req, res) => {
+  const message = req.body.message;
+
+  res.json({
+    reply: `Smile AI received: ${message}`
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Smile AI running on port ${PORT}`);
+});
