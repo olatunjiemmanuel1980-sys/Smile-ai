@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smile AI</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .chat {
+      width: 90%;
+      max-width: 500px;
+      height: 80vh;
+      background: white;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.15);
+    }
+
+    .header {
+      background: #111;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    #messages {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+    .message {
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 12px;
+      max-width: 80%;
+    }
+
+    .user {
+      background: #111;
+      color: white;
+      margin-left: auto;
+    }
+
+    .ai {
+      background: #eee;
+      color: #111;
+    }
+
+    .input-area {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ddd;
+    }
+
+    input {
+      flex: 1;
+      padding: 14px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    button {
+      margin-left: 8px;
+      padding: 14px 18px;
+      border: none;
+      border-radius: 10px;
+      background: #111;
+      color: white;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="chat">
+
+    <div class="header">
+      🤖 Smile AI
+    </div>
+
+    <div id="messages">
+      <div class="message ai">
+        Hey! I'm Smile AI 😊 How can I help you?
+      </div>
+    </div>
+
+    <div class="input-area">
+      <input
+        id="input"
+        type="text"
+        placeholder="Message Smile AI..."
+      >
+
+      <button onclick="sendMessage()">Send</button>
+    </div>
+
+  </div>
+
+  <script>
+    async function sendMessage() {
+
+      const input = document.getElementById("input");
+      const messages = document.getElementById("messages");
+
+      const message = input.value.trim();
+
+      if (!message) return;
+
+      messages.innerHTML += `
+        <div class="message user">
+          ${message}
+        </div>
+      `;
+
+      input.value = "";
+
+      const loading = document.createElement("div");
+      loading.className = "message ai";
+      loading.textContent = "Smile is thinking... 🤔";
+      messages.appendChild(loading);
+
+      try {
+
+        const response = await fetch(
+          "https://smile-ai-2.onrender.com/chat",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              message: message
+            })
+          }
+        );
+
+        const data = await response.json();
+
+        loading.textContent = data.reply || data.error;
+
+      } catch (error) {
+
+        loading.textContent =
+          "Sorry, I couldn't connect to Smile AI. 😢";
+
+      }
+
+      messages.scrollTop = messages.scrollHeight;
+    }
+  </script>
+
+</body>
+  </html>
