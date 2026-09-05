@@ -1,12 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-const OpenAI = require("openai");
+const { GoogleGenAI } = require("@google/genai");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY
 });
 
 app.use(cors());
@@ -28,17 +28,17 @@ app.post("/chat", async (req, res) => {
       });
     }
 
-    const response = await client.responses.create({
-      model: "gpt-5-mini",
-      input: message
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: message
     });
 
     res.json({
-      reply: response.output_text
+      reply: response.text
     });
 
   } catch (error) {
-    console.error("OPENAI ERROR:", error);
+    console.error("GEMINI ERROR:", error);
 
     res.status(500).json({
       error: error.message || "Smile AI could not respond."
