@@ -38,10 +38,10 @@ app.post("/chat", async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("OPENAI ERROR:", error);
 
     res.status(500).json({
-      error: "Smile AI could not respond."
+      error: error.message || "Smile AI could not respond."
     });
   }
 });
