@@ -162,7 +162,7 @@
 
       try {
         const response = await fetch(
-          "https://smile-ai-2.onrender.com/chat",
+          "https://smile-ai-1.onrender.com/chat",
           {
             method: "POST",
             headers: {
@@ -179,11 +179,13 @@
         if (data.reply) {
           loading.textContent = data.reply;
         } else {
-          loading.textContent = data.error || "Something went wrong. 😢";
+          loading.textContent =
+            data.error || "Something went wrong. 😢";
         }
 
       } catch (error) {
         console.error(error);
+
         loading.textContent =
           "I couldn't connect to Smile AI. Please try again. 😢";
       }
