@@ -27,6 +27,9 @@ app.get("/", (req, res) => {
 app.post("/chat", async (req, res) => {
   try {
     const message = req.body.message;
+    const history = Array.isArray(req.body.history)
+      ? req.body.history
+      : [];
 
     if (!message) {
       return res.status(400).json({
@@ -62,26 +65,40 @@ LANGUAGE AND SPEAKING STYLE:
 - If the user asks a school, technical, professional, or serious question, use clear and appropriate English.
 - Do not randomly switch to Pidgin when the user is speaking normal English.
 - Do not force slang, emojis, or jokes.
-- Keep simple questions reasonably short.
-- Explain difficult topics clearly and step-by-step.
-- You can understand Nigerian English and Nigerian Pidgin.
 
-IMPORTANT:
-- Always prioritize understanding the user's meaning over copying their exact wording.
-- Adapt your response style based on the user's latest message.
-- Do not exaggerate the user's accent or slang.
-- If the user changes from Pidgin to English, change with them.
-- If the user changes from English to Pidgin, change with them.
+CONVERSATION MEMORY:
+- Use the conversation history provided to understand previous messages.
+- Remember important information from earlier messages in the current conversation.
+- Use previous messages when answering follow-up questions.
+- Do not claim to remember information that is not present in the conversation history.
+- If the user asks about something mentioned earlier, use the available history to answer naturally.
 
 Your goal is to make every conversation useful, natural and enjoyable.
 `;
 
+    const safeHistory = history
+      .slice(-20)
+      .map((item) => {
+        const role = item.role === "assistant" ? "Smile AI" : "User";
+        return `${role}: ${String(item.content || "")}`;
+      })
+      .join("\n");
+
+    const prompt = `
+${systemInstruction}
+
+CONVERSATION HISTORY:
+${safeHistory || "No previous conversation."}
+
+LATEST USER MESSAGE:
+${message}
+
+Respond naturally to the latest user message while using the conversation history when relevant.
+`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash-lite",
-      contents: `${systemInstruction}
-
-User message:
-${message}`
+      contents: prompt
     });
 
     res.json({
