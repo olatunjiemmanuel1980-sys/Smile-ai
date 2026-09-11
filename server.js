@@ -44,7 +44,7 @@ app.post("/chat", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-3.5-flash-lite",
       contents: message
     });
 
@@ -57,6 +57,7 @@ app.post("/chat", async (req, res) => {
 
     res.status(500).json({
       error: error.message || "Smile AI could not respond."
+ 
     });
   }
 });
