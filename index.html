@@ -3,196 +3,471 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smile AI</title>
+
+  <title>Smile AI 🤖</title>
 
   <style>
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      background: #f5f7fb;
+      color: #111827;
+      height: 100vh;
+      overflow: hidden;
+      transition: 0.3s;
     }
 
-    .chat {
-      width: 100%;
-      max-width: 500px;
-      height: 90vh;
-      background: white;
-      border-radius: 20px;
-      overflow: hidden;
+    body.dark {
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    .app {
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+      max-width: 900px;
+      margin: auto;
+      background: inherit;
     }
 
-    .header {
-      background: #111;
-      color: white;
-      padding: 20px;
-      text-align: center;
-      font-size: 24px;
-      font-weight: bold;
-    }
-
-    #messages {
-      flex: 1;
-      padding: 15px;
-      overflow-y: auto;
-    }
-
-    .message {
-      padding: 12px 15px;
-      margin: 8px 0;
-      border-radius: 15px;
-      max-width: 80%;
-      word-wrap: break-word;
-    }
-
-    .user {
-      background: #111;
-      color: white;
-      margin-left: auto;
-    }
-
-    .ai {
-      background: #eeeeee;
-      color: #111;
-      margin-right: auto;
-    }
-
-    .input-area {
+    header {
+      padding: 16px 18px;
       display: flex;
-      padding: 12px;
-      border-top: 1px solid #ddd;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #ddd;
+      background: inherit;
+    }
+
+    body.dark header {
+      border-color: #374151;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111827;
+      color: white;
+      font-size: 22px;
+    }
+
+    body.dark .logo {
+      background: white;
+      color: #111827;
+    }
+
+    .brand h1 {
+      font-size: 20px;
+    }
+
+    .brand p {
+      font-size: 12px;
+      opacity: 0.65;
+      margin-top: 3px;
+    }
+
+    .header-buttons {
+      display: flex;
       gap: 8px;
     }
 
-    #input {
-      flex: 1;
-      padding: 14px;
-      border: 1px solid #ccc;
-      border-radius: 12px;
-      outline: none;
-      font-size: 16px;
-    }
-
     button {
-      padding: 14px 18px;
       border: none;
-      border-radius: 12px;
-      background: #111;
-      color: white;
-      font-weight: bold;
       cursor: pointer;
+      font-family: inherit;
     }
 
-    button:disabled {
-      opacity: 0.6;
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #111827;
+      font-size: 17px;
+    }
+
+    body.dark .icon-btn {
+      background: #374151;
+      color: white;
+    }
+
+    .chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      display: flex;
+      margin-bottom: 16px;
+    }
+
+    .message.user {
+      justify-content: flex-end;
+    }
+
+    .bubble {
+      max-width: 78%;
+      padding: 12px 15px;
+      border-radius: 18px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+
+    .assistant .bubble {
+      background: #e5e7eb;
+      border-bottom-left-radius: 5px;
+    }
+
+    .user .bubble {
+      background: #111827;
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+
+    body.dark .assistant .bubble {
+      background: #374151;
+      color: white;
+    }
+
+    body.dark .user .bubble {
+      background: #f9fafb;
+      color: #111827;
+    }
+
+    .time {
+      font-size: 10px;
+      opacity: 0.55;
+      margin-top: 5px;
+    }
+
+    .user .time {
+      text-align: right;
+    }
+
+    .typing {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .typing .bubble {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: bounce 1.2s infinite;
+      opacity: 0.5;
+    }
+
+    .dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+      0%, 60%, 100% {
+        transform: translateY(0);
+      }
+
+      30% {
+        transform: translateY(-5px);
+      }
+    }
+
+    .input-area {
+      padding: 12px;
+      border-top: 1px solid #ddd;
+      background: inherit;
+    }
+
+    body.dark .input-area {
+      border-color: #374151;
+    }
+
+    .input-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #e5e7eb;
+      border-radius: 28px;
+      padding: 6px;
+    }
+
+    body.dark .input-box {
+      background: #374151;
+    }
+
+    #messageInput {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      padding: 11px 12px;
+      font-size: 15px;
+      color: inherit;
+      min-width: 0;
+    }
+
+    #messageInput::placeholder {
+      color: #6b7280;
+    }
+
+    .send-btn,
+    .voice-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .voice-btn {
+      background: transparent;
+      color: inherit;
+    }
+
+    .voice-btn.listening {
+      background: #ef4444;
+      color: white;
+    }
+
+    .send-btn {
+      background: #111827;
+      color: white;
+    }
+
+    body.dark .send-btn {
+      background: white;
+      color: #111827;
+    }
+
+    .welcome {
+      text-align: center;
+      padding: 40px 20px;
+      opacity: 0.8;
+    }
+
+    .welcome-icon {
+      font-size: 50px;
+      margin-bottom: 10px;
+    }
+
+    .welcome h2 {
+      margin-bottom: 8px;
+    }
+
+    .welcome p {
+      font-size: 14px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 350px;
+      background: white;
+      color: #111827;
+      padding: 22px;
+      border-radius: 18px;
+      text-align: center;
+    }
+
+    body.dark .modal-box {
+      background: #1f2937;
+      color: white;
+    }
+
+    .modal-box h3 {
+      margin-bottom: 8px;
+    }
+
+    .modal-box p {
+      font-size: 14px;
+      opacity: 0.75;
+      margin-bottom: 18px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+      padding: 11px;
+      border-radius: 10px;
+    }
+
+    .cancel {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .confirm {
+      background: #ef4444;
+      color: white;
+    }
+
+    @media (max-width: 600px) {
+      .bubble {
+        max-width: 86%;
+      }
+
+      .chat {
+        padding: 15px;
+      }
     }
   </style>
 </head>
 
 <body>
 
-  <div class="chat">
+  <div class="app">
 
-    <div class="header">
-      🤖 Smile AI
-    </div>
+    <header>
+      <div class="brand">
+        <div class="logo">🤖</div>
 
-    <div id="messages">
-      <div class="message ai">
-        Hey! I'm Smile AI 😊 How can I help you?
+        <div>
+          <h1>Smile AI</h1>
+          <p>Your friendly AI assistant</p>
+        </div>
+      </div>
+
+      <div class="header-buttons">
+        <button class="icon-btn" id="themeBtn" title="Change theme">🌙</button>
+        <button class="icon-btn" id="clearBtn" title="Clear chat">🗑️</button>
+      </div>
+    </header>
+
+    <main class="chat" id="chat">
+
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🤖</div>
+        <h2>Hey! I'm Smile AI 😊</h2>
+        <p>How can I help you today?</p>
+      </div>
+
+    </main>
+
+    <div class="typing" id="typing">
+      <div class="bubble">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
       </div>
     </div>
 
     <div class="input-area">
-      <input
-        id="input"
-        type="text"
-        placeholder="Message Smile AI..."
-        autocomplete="off"
-      >
+      <div class="input-box">
 
-      <button id="sendButton" onclick="sendMessage()">
-        Send
-      </button>
+        <button class="voice-btn" id="voiceBtn" title="Voice input">
+          🎙️
+        </button>
+
+        <input
+          id="messageInput"
+          type="text"
+          placeholder="Message Smile AI..."
+          autocomplete="off"
+        >
+
+        <button class="send-btn" id="sendBtn" title="Send">
+          ➤
+        </button>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="modal" id="clearModal">
+
+    <div class="modal-box">
+      <h3>Clear conversation?</h3>
+
+      <p>
+        This will remove your saved conversation from this device.
+      </p>
+
+      <div class="modal-buttons">
+
+        <button class="cancel" id="cancelClear">
+          Cancel
+        </button>
+
+        <button class="confirm" id="confirmClear">
+          Clear
+        </button>
+
+      </div>
     </div>
 
   </div>
 
   <script>
-    const input = document.getElementById("input");
-    const messages = document.getElementById("messages");
-    const sendButton = document.getElementById("sendButton");
+    const BACKEND_URL =
+      "https://smile-ai-1.onrender.com/chat";
 
-    input.addEventListener("keydown", function(event) {
-      if (event.key === "Enter") {
-        sendMessage();
-      }
-    });
+    const chat = document.getElementById("chat");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const voiceBtn = document.getElementById("voiceBtn");
+    const typing = document.getElementById("typing");
+    const welcome = document.getElementById("welcome");
 
-    async function sendMessage() {
-      const message = input.value.trim();
+    const themeBtn = document.getElementById("themeBtn");
+    const clearBtn = document.getElementById("clearBtn");
 
-      if (!message) return;
+    const clearModal = document.getElementById("clearModal");
+    const cancelClear = document.getElementById("cancelClear");
+    const confirmClear = document.getElementById("confirmClear");
 
-      messages.innerHTML += `
-        <div class="message user">
-          ${escapeHTML(message)}
-        </div>
-      `;
+    let conversationHistory =
+      JSON.parse(localStorage.getItem("smileConversation")) || [];
 
-      input.value = "";
-      sendButton.disabled = true;
-
-      const loading = document.createElement("div");
-      loading.className = "message ai";
-      loading.textContent = "Smile is thinking... 🤔";
-      messages.appendChild(loading);
-
-      messages.scrollTop = messages.scrollHeight;
-
-      try {
-        const response = await fetch(
-          "https://smile-ai-1.onrender.com/chat",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              message: message
-            })
-          }
-        );
-
-        const data = await response.json();
-
-        if (data.reply) {
-          loading.textContent = data.reply;
-        } else {
-          loading.textContent =
-            data.error || "Something went wrong. 😢";
-        }
-
-      } catch (error) {
-        console.error(error);
-
-        loading.textContent =
-          "I couldn't connect to Smile AI. Please try again. 😢";
-      }
-
-      sendButton.disabled = false;
-      input.focus();
-      messages.scrollTop = messages.scrollHeight;
+    function getTime() {
+      return new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
     }
 
     function escapeHTML(text) {
@@ -200,6 +475,269 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    function scrollToBottom() {
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addMessage(role, content, time = getTime(), save = true) {
+      if (welcome) {
+        welcome.style.display = "none";
+      }
+
+      const message = document.createElement("div");
+
+      message.className =
+        `message ${role === "user" ? "user" : "assistant"}`;
+
+      message.innerHTML = `
+        <div class="bubble">
+          <div>${escapeHTML(content).replace(/\n/g, "<br>")}</div>
+          <div class="time">${time}</div>
+        </div>
+      `;
+
+      chat.appendChild(message);
+
+      if (save) {
+        conversationHistory.push({
+          role: role === "user" ? "user" : "assistant",
+          content: content,
+          time: time
+        });
+
+        localStorage.setItem(
+          "smileConversation",
+          JSON.stringify(conversationHistory)
+        );
+      }
+
+      scrollToBottom();
+    }
+
+    function loadHistory() {
+      if (!conversationHistory.length) {
+        return;
+      }
+
+      if (welcome) {
+        welcome.style.display = "none";
+      }
+
+      conversationHistory.forEach((item) => {
+        addMessage(
+          item.role,
+          item.content,
+          item.time || getTime(),
+          false
+        );
+      });
+
+      scrollToBottom();
+    }
+
+    function showTyping() {
+      typing.style.display = "block";
+      scrollToBottom();
+    }
+
+    function hideTyping() {
+      typing.style.display = "none";
+    }
+
+    async function sendMessage() {
+      const message = messageInput.value.trim();
+
+      if (!message) {
+        return;
+      }
+
+      messageInput.value = "";
+      sendBtn.disabled = true;
+
+      addMessage("user", message);
+
+      showTyping();
+
+      try {
+        const response = await fetch(BACKEND_URL, {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            message: message,
+
+            history: conversationHistory
+              .slice(0, -1)
+              .slice(-20)
+              .map((item) => ({
+                role: item.role,
+                content: item.content
+              }))
+          })
+        });
+
+        const data = await response.json();
+
+        hideTyping();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Something went wrong."
+          );
+        }
+
+        addMessage(
+          "assistant",
+          data.reply || "I couldn't generate a response."
+        );
+
+      } catch (error) {
+
+        hideTyping();
+
+        addMessage(
+          "assistant",
+          "Sorry 😕 I couldn't connect to Smile AI right now."
+        );
+
+        console.error("CHAT ERROR:", error);
+
+      } finally {
+        sendBtn.disabled = false;
+        messageInput.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    messageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+
+    themeBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+
+      const dark =
+        document.body.classList.contains("dark");
+
+      localStorage.setItem(
+        "smileTheme",
+        dark ? "dark" : "light"
+      );
+
+      themeBtn.textContent = dark ? "☀️" : "🌙";
+    });
+
+    function loadTheme() {
+      const theme =
+        localStorage.getItem("smileTheme");
+
+      if (theme === "dark") {
+        document.body.classList.add("dark");
+        themeBtn.textContent = "☀️";
+      } else {
+        themeBtn.textContent = "🌙";
+      }
+    }
+
+    clearBtn.addEventListener("click", () => {
+      clearModal.style.display = "flex";
+    });
+
+    cancelClear.addEventListener("click", () => {
+      clearModal.style.display = "none";
+    });
+
+    confirmClear.addEventListener("click", () => {
+      localStorage.removeItem("smileConversation");
+
+      conversationHistory = [];
+
+      chat.innerHTML = `
+        <div class="welcome" id="welcome">
+          <div class="welcome-icon">🤖</div>
+          <h2>Hey! I'm Smile AI 😊</h2>
+          <p>How can I help you today?</p>
+        </div>
+      `;
+
+      clearModal.style.display = "none";
+    });
+
+    clearModal.addEventListener("click", (event) => {
+      if (event.target === clearModal) {
+        clearModal.style.display = "none";
+      }
+    });
+
+    let recognition = null;
+
+    if (
+      "SpeechRecognition" in window ||
+      "webkitSpeechRecognition" in window
+    ) {
+
+      const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+      recognition = new SpeechRecognition();
+
+      recognition.lang = "en-NG";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        voiceBtn.classList.add("listening");
+        voiceBtn.textContent = "🔴";
+      };
+
+      recognition.onend = () => {
+        voiceBtn.classList.remove("listening");
+        voiceBtn.textContent = "🎙️";
+      };
+
+      recognition.onresult = (event) => {
+        const transcript =
+          event.results[0][0].transcript;
+
+        messageInput.value = transcript;
+
+        messageInput.focus();
+      };
+
+      recognition.onerror = (event) => {
+        console.error("VOICE ERROR:", event.error);
+
+        voiceBtn.classList.remove("listening");
+        voiceBtn.textContent = "🎙️";
+      };
+
+      voiceBtn.addEventListener("click", () => {
+        try {
+          recognition.start();
+        } catch (error) {
+          console.log("Voice already active.");
+        }
+      });
+
+    } else {
+
+      voiceBtn.style.display = "none";
+
+    }
+
+    loadTheme();
+    loadHistory();
+
+    messageInput.focus();
   </script>
 
 </body>
