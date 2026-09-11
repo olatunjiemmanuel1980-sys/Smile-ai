@@ -164,13 +164,20 @@
 
     .typing {
       display: none;
-      margin-bottom: 16px;
+      padding: 0 20px 10px;
     }
 
     .typing .bubble {
-      display: flex;
+      display: inline-flex;
       gap: 4px;
       align-items: center;
+      background: #e5e7eb;
+      padding: 12px 15px;
+      border-radius: 18px;
+    }
+
+    body.dark .typing .bubble {
+      background: #374151;
     }
 
     .dot {
@@ -291,7 +298,7 @@
     .modal {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.55);
+      background: rgba(0, 0, 0, 0.55);
       display: none;
       align-items: center;
       justify-content: center;
@@ -353,6 +360,11 @@
       .chat {
         padding: 15px;
       }
+
+      .typing {
+        padding-left: 15px;
+        padding-right: 15px;
+      }
     }
   </style>
 </head>
@@ -372,8 +384,17 @@
       </div>
 
       <div class="header-buttons">
-        <button class="icon-btn" id="themeBtn" title="Change theme">🌙</button>
-        <button class="icon-btn" id="clearBtn" title="Clear chat">🗑️</button>
+        <button class="icon-btn" id="voiceToggle" title="Voice replies">
+          🔊
+        </button>
+
+        <button class="icon-btn" id="themeBtn" title="Change theme">
+          🌙
+        </button>
+
+        <button class="icon-btn" id="clearBtn" title="Clear chat">
+          🗑️
+        </button>
       </div>
     </header>
 
@@ -381,7 +402,9 @@
 
       <div class="welcome" id="welcome">
         <div class="welcome-icon">🤖</div>
+
         <h2>Hey! I'm Smile AI 😊</h2>
+
         <p>How can I help you today?</p>
       </div>
 
@@ -398,7 +421,10 @@
     <div class="input-area">
       <div class="input-box">
 
-        <button class="voice-btn" id="voiceBtn" title="Voice input">
+        <button
+          class="voice-btn"
+          id="voiceBtn"
+          title="Voice input">
           🎙️
         </button>
 
@@ -406,10 +432,12 @@
           id="messageInput"
           type="text"
           placeholder="Message Smile AI..."
-          autocomplete="off"
-        >
+          autocomplete="off">
 
-        <button class="send-btn" id="sendBtn" title="Send">
+        <button
+          class="send-btn"
+          id="sendBtn"
+          title="Send">
           ➤
         </button>
 
@@ -421,6 +449,7 @@
   <div class="modal" id="clearModal">
 
     <div class="modal-box">
+
       <h3>Clear conversation?</h3>
 
       <p>
@@ -429,255 +458,704 @@
 
       <div class="modal-buttons">
 
-        <button class="cancel" id="cancelClear">
+        <button
+          class="cancel"
+          id="cancelClear">
           Cancel
         </button>
 
-        <button class="confirm" id="confirmClear">
+        <button
+          class="confirm"
+          id="confirmClear">
           Clear
         </button>
 
       </div>
+
     </div>
 
   </div>
 
   <script>
+
     const BACKEND_URL =
       "https://smile-ai-1.onrender.com/chat";
 
-    const chat = document.getElementById("chat");
-    const messageInput = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
-    const voiceBtn = document.getElementById("voiceBtn");
-    const typing = document.getElementById("typing");
-    const welcome = document.getElementById("welcome");
+    const chat =
+      document.getElementById("chat");
 
-    const themeBtn = document.getElementById("themeBtn");
-    const clearBtn = document.getElementById("clearBtn");
+    const messageInput =
+      document.getElementById("messageInput");
 
-    const clearModal = document.getElementById("clearModal");
-    const cancelClear = document.getElementById("cancelClear");
-    const confirmClear = document.getElementById("confirmClear");
+    const sendBtn =
+      document.getElementById("sendBtn");
+
+    const voiceBtn =
+      document.getElementById("voiceBtn");
+
+    const voiceToggle =
+      document.getElementById("voiceToggle");
+
+    const typing =
+      document.getElementById("typing");
+
+    const welcome =
+      document.getElementById("welcome");
+
+    const themeBtn =
+      document.getElementById("themeBtn");
+
+    const clearBtn =
+      document.getElementById("clearBtn");
+
+    const clearModal =
+      document.getElementById("clearModal");
+
+    const cancelClear =
+      document.getElementById("cancelClear");
+
+    const confirmClear =
+      document.getElementById("confirmClear");
+
+
+    /* =========================
+       CONVERSATION MEMORY
+    ========================= */
 
     let conversationHistory =
-      JSON.parse(localStorage.getItem("smileConversation")) || [];
+      JSON.parse(
+        localStorage.getItem("smileConversation")
+      ) || [];
 
-    function getTime() {
-      return new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-    }
 
-    function escapeHTML(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
+    /* =========================
+       VOICE SETTINGS
+    ========================= */
 
-    function scrollToBottom() {
-      chat.scrollTop = chat.scrollHeight;
-    }
+    let voiceReplies =
+      localStorage.getItem("smileVoice") !== "off";
 
-    function addMessage(role, content, time = getTime(), save = true) {
-      if (welcome) {
-        welcome.style.display = "none";
+    let availableVoices = [];
+
+
+    function loadVoices() {
+
+      if (!("speechSynthesis" in window)) {
+        return;
       }
 
-      const message = document.createElement("div");
+      availableVoices =
+        window.speechSynthesis.getVoices();
+
+    }
+
+
+    loadVoices();
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged =
+        loadVoices;
+    }
+
+
+    function chooseVoice() {
+
+      if (!availableVoices.length) {
+        return null;
+      }
+
+      const preferredLanguages = [
+        "en-NG",
+        "en-GB",
+        "en-US",
+        "en-AU",
+        "en"
+      ];
+
+      for (const language of preferredLanguages) {
+
+        const voice =
+          availableVoices.find(
+            v => v.lang === language
+          );
+
+        if (voice) {
+          return voice;
+        }
+      }
+
+      return availableVoices.find(
+        v => v.lang &&
+        v.lang.toLowerCase().startsWith("en")
+      ) || availableVoices[0];
+    }
+
+
+    function speak(text) {
+
+      if (!voiceReplies) {
+        return;
+      }
+
+      if (!("speechSynthesis" in window)) {
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+
+      const cleanText =
+        text
+          .replace(/[*#_`]/g, "")
+          .replace(/\n+/g, " ")
+          .trim();
+
+      if (!cleanText) {
+        return;
+      }
+
+      const utterance =
+        new SpeechSynthesisUtterance(cleanText);
+
+      const voice = chooseVoice();
+
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      } else {
+        utterance.lang = "en-NG";
+      }
+
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+
+      window.speechSynthesis.speak(
+        utterance
+      );
+    }
+
+
+    function updateVoiceButton() {
+
+      voiceToggle.textContent =
+        voiceReplies ? "🔊" : "🔇";
+
+      voiceToggle.title =
+        voiceReplies
+          ? "Voice replies ON"
+          : "Voice replies OFF";
+    }
+
+
+    voiceToggle.addEventListener(
+      "click",
+      () => {
+
+        voiceReplies = !voiceReplies;
+
+        localStorage.setItem(
+          "smileVoice",
+          voiceReplies ? "on" : "off"
+        );
+
+        updateVoiceButton();
+
+        if (!voiceReplies &&
+            "speechSynthesis" in window) {
+
+          window.speechSynthesis.cancel();
+        }
+      }
+    );
+
+
+    updateVoiceButton();
+
+
+    /* =========================
+       TIME
+    ========================= */
+
+    function getTime() {
+
+      return new Date().toLocaleTimeString(
+        [],
+        {
+          hour: "2-digit",
+          minute: "2-digit"
+        }
+      );
+
+    }
+
+
+    /* =========================
+       SECURITY
+    ========================= */
+
+    function escapeHTML(text) {
+
+      const div =
+        document.createElement("div");
+
+      div.textContent = text;
+
+      return div.innerHTML;
+
+    }
+
+
+    /* =========================
+       SCROLL
+    ========================= */
+
+    function scrollToBottom() {
+
+      chat.scrollTop =
+        chat.scrollHeight;
+
+    }
+
+
+    /* =========================
+       ADD MESSAGE
+    ========================= */
+
+    function addMessage(
+      role,
+      content,
+      time = getTime(),
+      save = true
+    ) {
+
+      const currentWelcome =
+        document.getElementById("welcome");
+
+      if (currentWelcome) {
+        currentWelcome.style.display =
+          "none";
+      }
+
+      const message =
+        document.createElement("div");
 
       message.className =
-        `message ${role === "user" ? "user" : "assistant"}`;
+        `message ${
+          role === "user"
+            ? "user"
+            : "assistant"
+        }`;
 
       message.innerHTML = `
         <div class="bubble">
-          <div>${escapeHTML(content).replace(/\n/g, "<br>")}</div>
-          <div class="time">${time}</div>
+
+          <div>
+            ${escapeHTML(content)
+              .replace(/\n/g, "<br>")}
+          </div>
+
+          <div class="time">
+            ${escapeHTML(time)}
+          </div>
+
         </div>
       `;
 
       chat.appendChild(message);
 
+
       if (save) {
+
         conversationHistory.push({
-          role: role === "user" ? "user" : "assistant",
+
+          role:
+            role === "user"
+              ? "user"
+              : "assistant",
+
           content: content,
+
           time: time
+
         });
+
 
         localStorage.setItem(
           "smileConversation",
-          JSON.stringify(conversationHistory)
+          JSON.stringify(
+            conversationHistory
+          )
         );
+
       }
 
+
       scrollToBottom();
+
     }
 
+
+    /* =========================
+       LOAD SAVED CHAT
+    ========================= */
+
     function loadHistory() {
+
       if (!conversationHistory.length) {
         return;
       }
 
-      if (welcome) {
-        welcome.style.display = "none";
+      const currentWelcome =
+        document.getElementById("welcome");
+
+      if (currentWelcome) {
+        currentWelcome.style.display =
+          "none";
       }
 
-      conversationHistory.forEach((item) => {
-        addMessage(
-          item.role,
-          item.content,
-          item.time || getTime(),
-          false
-        );
-      });
+
+      conversationHistory.forEach(
+        item => {
+
+          addMessage(
+            item.role,
+            item.content,
+            item.time || getTime(),
+            false
+          );
+
+        }
+      );
+
 
       scrollToBottom();
+
     }
+
+
+    /* =========================
+       TYPING
+    ========================= */
 
     function showTyping() {
-      typing.style.display = "block";
+
+      typing.style.display =
+        "block";
+
       scrollToBottom();
+
     }
+
 
     function hideTyping() {
-      typing.style.display = "none";
+
+      typing.style.display =
+        "none";
+
     }
 
+
+    /* =========================
+       SEND MESSAGE
+    ========================= */
+
     async function sendMessage() {
-      const message = messageInput.value.trim();
+
+      const message =
+        messageInput.value.trim();
 
       if (!message) {
         return;
       }
 
+
       messageInput.value = "";
+
       sendBtn.disabled = true;
 
-      addMessage("user", message);
+
+      addMessage(
+        "user",
+        message
+      );
+
 
       showTyping();
 
+
       try {
-        const response = await fetch(BACKEND_URL, {
-          method: "POST",
 
-          headers: {
-            "Content-Type": "application/json"
-          },
+        const response =
+          await fetch(
+            BACKEND_URL,
+            {
+              method: "POST",
 
-          body: JSON.stringify({
-            message: message,
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
 
-            history: conversationHistory
-              .slice(0, -1)
-              .slice(-20)
-              .map((item) => ({
-                role: item.role,
-                content: item.content
-              }))
-          })
-        });
+              body: JSON.stringify({
 
-        const data = await response.json();
+                message: message,
+
+                history:
+                  conversationHistory
+                    .slice(0, -1)
+                    .slice(-20)
+                    .map(item => ({
+                      role: item.role,
+                      content: item.content
+                    }))
+
+              })
+
+            }
+          );
+
+
+        const data =
+          await response.json();
+
 
         hideTyping();
 
+
         if (!response.ok) {
+
           throw new Error(
-            data.error || "Something went wrong."
+            data.error ||
+            "Something went wrong."
           );
+
         }
+
+
+        const reply =
+          data.reply ||
+          "I couldn't generate a response.";
+
 
         addMessage(
           "assistant",
-          data.reply || "I couldn't generate a response."
+          reply
         );
+
+
+        /* Speak Smile AI's reply */
+        speak(reply);
+
 
       } catch (error) {
 
         hideTyping();
 
+        const errorMessage =
+          "Sorry 😕 I couldn't connect to Smile AI right now.";
+
         addMessage(
           "assistant",
-          "Sorry 😕 I couldn't connect to Smile AI right now."
+          errorMessage
         );
 
-        console.error("CHAT ERROR:", error);
+        console.error(
+          "CHAT ERROR:",
+          error
+        );
 
       } finally {
+
         sendBtn.disabled = false;
+
         messageInput.focus();
+
       }
+
     }
 
-    sendBtn.addEventListener("click", sendMessage);
 
-    messageInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        sendMessage();
+    sendBtn.addEventListener(
+      "click",
+      sendMessage
+    );
+
+
+    messageInput.addEventListener(
+      "keydown",
+      event => {
+
+        if (event.key === "Enter") {
+
+          event.preventDefault();
+
+          sendMessage();
+
+        }
+
       }
-    });
+    );
 
-    themeBtn.addEventListener("click", () => {
-      document.body.classList.toggle("dark");
 
-      const dark =
-        document.body.classList.contains("dark");
+    /* =========================
+       DARK / LIGHT MODE
+    ========================= */
 
-      localStorage.setItem(
-        "smileTheme",
-        dark ? "dark" : "light"
-      );
+    themeBtn.addEventListener(
+      "click",
+      () => {
 
-      themeBtn.textContent = dark ? "☀️" : "🌙";
-    });
+        document.body.classList.toggle(
+          "dark"
+        );
+
+        const dark =
+          document.body.classList.contains(
+            "dark"
+          );
+
+
+        localStorage.setItem(
+          "smileTheme",
+          dark
+            ? "dark"
+            : "light"
+        );
+
+
+        themeBtn.textContent =
+          dark
+            ? "☀️"
+            : "🌙";
+
+      }
+    );
+
 
     function loadTheme() {
+
       const theme =
-        localStorage.getItem("smileTheme");
+        localStorage.getItem(
+          "smileTheme"
+        );
+
 
       if (theme === "dark") {
-        document.body.classList.add("dark");
-        themeBtn.textContent = "☀️";
+
+        document.body.classList.add(
+          "dark"
+        );
+
+        themeBtn.textContent =
+          "☀️";
+
       } else {
-        themeBtn.textContent = "🌙";
+
+        themeBtn.textContent =
+          "🌙";
+
       }
+
     }
 
-    clearBtn.addEventListener("click", () => {
-      clearModal.style.display = "flex";
-    });
 
-    cancelClear.addEventListener("click", () => {
-      clearModal.style.display = "none";
-    });
+    /* =========================
+       CLEAR CHAT
+    ========================= */
 
-    confirmClear.addEventListener("click", () => {
-      localStorage.removeItem("smileConversation");
+    clearBtn.addEventListener(
+      "click",
+      () => {
 
-      conversationHistory = [];
+        clearModal.style.display =
+          "flex";
 
-      chat.innerHTML = `
-        <div class="welcome" id="welcome">
-          <div class="welcome-icon">🤖</div>
-          <h2>Hey! I'm Smile AI 😊</h2>
-          <p>How can I help you today?</p>
-        </div>
-      `;
-
-      clearModal.style.display = "none";
-    });
-
-    clearModal.addEventListener("click", (event) => {
-      if (event.target === clearModal) {
-        clearModal.style.display = "none";
       }
-    });
+    );
+
+
+    cancelClear.addEventListener(
+      "click",
+      () => {
+
+        clearModal.style.display =
+          "none";
+
+      }
+    );
+
+
+    confirmClear.addEventListener(
+      "click",
+      () => {
+
+        localStorage.removeItem(
+          "smileConversation"
+        );
+
+        conversationHistory = [];
+
+
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+
+
+        chat.innerHTML = `
+
+          <div
+            class="welcome"
+            id="welcome"
+          >
+
+            <div class="welcome-icon">
+              🤖
+            </div>
+
+            <h2>
+              Hey! I'm Smile AI 😊
+            </h2>
+
+            <p>
+              How can I help you today?
+            </p>
+
+          </div>
+
+        `;
+
+
+        clearModal.style.display =
+          "none";
+
+      }
+    );
+
+
+    clearModal.addEventListener(
+      "click",
+      event => {
+
+        if (
+          event.target ===
+          clearModal
+        ) {
+
+          clearModal.style.display =
+            "none";
+
+        }
+
+      }
+    );
+
+
+    /* =========================
+       VOICE INPUT
+    ========================= */
 
     let recognition = null;
+
 
     if (
       "SpeechRecognition" in window ||
@@ -688,56 +1166,120 @@
         window.SpeechRecognition ||
         window.webkitSpeechRecognition;
 
-      recognition = new SpeechRecognition();
 
-      recognition.lang = "en-NG";
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition =
+        new SpeechRecognition();
+
+
+      recognition.lang =
+        "en-NG";
+
+      recognition.continuous =
+        false;
+
+      recognition.interimResults =
+        false;
+
 
       recognition.onstart = () => {
-        voiceBtn.classList.add("listening");
-        voiceBtn.textContent = "🔴";
+
+        voiceBtn.classList.add(
+          "listening"
+        );
+
+        voiceBtn.textContent =
+          "🔴";
+
       };
+
 
       recognition.onend = () => {
-        voiceBtn.classList.remove("listening");
-        voiceBtn.textContent = "🎙️";
+
+        voiceBtn.classList.remove(
+          "listening"
+        );
+
+        voiceBtn.textContent =
+          "🎙️";
+
       };
 
-      recognition.onresult = (event) => {
-        const transcript =
-          event.results[0][0].transcript;
 
-        messageInput.value = transcript;
+      recognition.onresult =
+        event => {
 
-        messageInput.focus();
-      };
+          const transcript =
+            event
+              .results[0][0]
+              .transcript;
 
-      recognition.onerror = (event) => {
-        console.error("VOICE ERROR:", event.error);
 
-        voiceBtn.classList.remove("listening");
-        voiceBtn.textContent = "🎙️";
-      };
+          messageInput.value =
+            transcript;
 
-      voiceBtn.addEventListener("click", () => {
-        try {
-          recognition.start();
-        } catch (error) {
-          console.log("Voice already active.");
+
+          messageInput.focus();
+
+        };
+
+
+      recognition.onerror =
+        event => {
+
+          console.error(
+            "VOICE ERROR:",
+            event.error
+          );
+
+
+          voiceBtn.classList.remove(
+            "listening"
+          );
+
+          voiceBtn.textContent =
+            "🎙️";
+
+        };
+
+
+      voiceBtn.addEventListener(
+        "click",
+        () => {
+
+          try {
+
+            recognition.start();
+
+          } catch (error) {
+
+            console.log(
+              "Voice already active."
+            );
+
+          }
+
         }
-      });
+      );
+
 
     } else {
 
-      voiceBtn.style.display = "none";
+      voiceBtn.style.display =
+        "none";
 
     }
 
+
+    /* =========================
+       START APP
+    ========================= */
+
     loadTheme();
+
     loadHistory();
 
     messageInput.focus();
+
   </script>
 
 </body>
