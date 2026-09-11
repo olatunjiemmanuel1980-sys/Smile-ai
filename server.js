@@ -5,19 +5,28 @@ const { GoogleGenAI } = require("@google/genai");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Gemini API
+const apiKey = process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  console.error("GEMINI_API_KEY is missing!");
+}
+
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
+  apiKey: apiKey
 });
 
 app.use(cors());
 app.use(express.json());
 
+// Home / health check
 app.get("/", (req, res) => {
   res.json({
     message: "Smile AI is running! 🤖😊"
   });
 });
 
+// Chat endpoint
 app.post("/chat", async (req, res) => {
   try {
     const message = req.body.message;
@@ -28,8 +37,14 @@ app.post("/chat", async (req, res) => {
       });
     }
 
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "Gemini API key is missing on the server."
+      });
+    }
+
     const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
+      model: "gemini-3.8-flash",
       contents: message
     });
 
