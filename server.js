@@ -5,7 +5,6 @@ const { GoogleGenAI } = require("@google/genai");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Gemini API
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
@@ -19,14 +18,12 @@ const ai = new GoogleGenAI({
 app.use(cors());
 app.use(express.json());
 
-// Home / health check
 app.get("/", (req, res) => {
   res.json({
     message: "Smile AI is running! 🤖😊"
   });
 });
 
-// Chat endpoint
 app.post("/chat", async (req, res) => {
   try {
     const message = req.body.message;
@@ -43,9 +40,31 @@ app.post("/chat", async (req, res) => {
       });
     }
 
+    const systemInstruction = `
+You are Smile AI, a smart, friendly and slightly funny AI assistant.
+
+Your personality:
+- Be friendly, natural and easy to talk to.
+- Be intelligent and helpful.
+- Add light humor when it fits the conversation.
+- Never force jokes when the user is asking a serious question.
+- Keep simple questions reasonably short.
+- Explain difficult topics clearly and step-by-step.
+- You can understand Nigerian English and Nigerian Pidgin.
+- Do not pretend to be a human.
+- If you don't know something, say so instead of making it up.
+- Treat the user respectfully.
+- Your name is Smile AI.
+
+Your goal is to make every conversation useful, natural and enjoyable.
+`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash-lite",
-      contents: message
+      contents: `${systemInstruction}
+
+User message:
+${message}`
     });
 
     res.json({
@@ -57,7 +76,6 @@ app.post("/chat", async (req, res) => {
 
     res.status(500).json({
       error: error.message || "Smile AI could not respond."
- 
     });
   }
 });
