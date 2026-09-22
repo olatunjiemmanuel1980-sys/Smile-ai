@@ -351,8 +351,8 @@ ${faceProtection}`
       await ai.models.generateContent({
 
         model:
-          "gemini-3.1-flash-image",
-
+          model: "gemini-2.5-flash-lite",
+        
         contents,
 
         config: {
