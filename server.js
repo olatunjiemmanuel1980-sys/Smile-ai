@@ -1,339 +1,641 @@
-const express = require("express");
-const cors = require("cors");
-const { GoogleGenAI } = require("@google/genai");
+"use strict";
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+/*
+  SMILE AI FRONTEND
 
-const apiKey = process.env.GEMINI_API_KEY;
+  Keep this URL pointed at your existing Render backend.
+  Do not put your Gemini API key in this file.
+*/
 
-if (!apiKey) {
-  console.error("GEMINI_API_KEY is missing!");
+const BACKEND_URL = "https://smile-ai-1.onrender.com/chat";
+
+const STORAGE = {
+  chats: "smileChats",
+  current: "smileCurrentChat",
+  memories: "smileMemories",
+  theme: "smileTheme",
+  voice: "smileVoiceReplies"
+};
+
+const DEFAULT_MEMORIES = {
+  name: "",
+  favoriteFootballer: "",
+  favoriteClub: "",
+  favoriteGame: "",
+  favoriteColor: ""
+};
+
+const $ = (id) => document.getElementById(id);
+
+const elements = {
+  sidebar: $("sidebar"),
+  messages: $("messages"),
+  welcome: $("welcome"),
+  historyList: $("historyList"),
+  input: $("messageInput"),
+  form: $("chatForm"),
+  send: $("sendBtn"),
+  status: $("connectionStatus"),
+  notice: $("notice"),
+  menu: $("menuBtn"),
+  newChat: $("newChatBtn"),
+  theme: $("themeBtn"),
+  voiceToggle: $("voiceToggleBtn"),
+  memory: $("memoryBtn"),
+  clear: $("clearBtn"),
+  mic: $("micBtn"),
+  stopVoice: $("stopVoiceBtn")
+};
+
+let chats = readStorage(STORAGE.chats, []);
+let memories = {
+  ...DEFAULT_MEMORIES,
+  ...readStorage(STORAGE.memories, {})
+};
+
+let currentChatId = localStorage.getItem(STORAGE.current) || null;
+let isSending = false;
+let recognition = null;
+
+let voiceReplies = localStorage.getItem(STORAGE.voice) !== "false";
+
+function readStorage(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key));
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-const ai = new GoogleGenAI({
-  apiKey: apiKey
-});
+function saveChats() {
+  localStorage.setItem(STORAGE.chats, JSON.stringify(chats));
+}
 
-app.use(cors());
+function saveMemories() {
+  localStorage.setItem(STORAGE.memories, JSON.stringify(memories));
+}
 
-app.use(express.json({
-  limit: "25mb"
-}));
+function createId() {
+  return Date.now().toString(36) +
+    Math.random().toString(36).slice(2, 8);
+}
 
-app.get("/", (req, res) => {
-  res.json({
-    message: "Smile AI is running! 🤖😊"
+function currentChat() {
+  return chats.find(chat => chat.id === currentChatId) || null;
+}
+
+function createChat() {
+  const chat = {
+    id: createId(),
+    title: "New conversation",
+    messages: [],
+    updatedAt: Date.now()
+  };
+
+  chats.unshift(chat);
+  currentChatId = chat.id;
+
+  localStorage.setItem(STORAGE.current, currentChatId);
+  saveChats();
+  renderHistory();
+  renderChat();
+
+  return chat;
+}
+
+function ensureChat() {
+  let chat = currentChat();
+
+  if (!chat) {
+    chat = createChat();
+  }
+
+  return chat;
+}
+
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
   });
-});
+}
 
-app.post("/chat", async (req, res) => {
+function showNotice(message) {
+  elements.notice.textContent = message;
+  elements.notice.classList.remove("hidden");
+}
+
+function hideNotice() {
+  elements.notice.classList.add("hidden");
+  elements.notice.textContent = "";
+}
+
+function setStatus(message) {
+  elements.status.textContent = message;
+}
+
+function scrollToBottom() {
+  elements.messages.scrollTop = elements.messages.scrollHeight;
+}
+
+function renderHistory() {
+  elements.historyList.replaceChildren();
+
+  chats
+    .slice()
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .forEach(chat => {
+      const item = document.createElement("div");
+
+      item.className = "history-item";
+      item.textContent = chat.title || "New conversation";
+      item.title = chat.title || "New conversation";
+
+      if (chat.id === currentChatId) {
+        item.style.background = "var(--panel2)";
+      }
+
+      item.addEventListener("click", () => {
+        currentChatId = chat.id;
+        localStorage.setItem(STORAGE.current, currentChatId);
+        renderHistory();
+        renderChat();
+        elements.sidebar.classList.remove("open");
+      });
+
+      elements.historyList.appendChild(item);
+    });
+}
+
+function addMessageElement(message, index) {
+  const wrapper = document.createElement("article");
+  wrapper.className = `message ${message.role}`;
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = message.role === "user" ? "👤" : "😊";
+
+  const content = document.createElement("div");
+  content.className = "message-content";
+
+  const name = document.createElement("div");
+  name.className = "message-name";
+  name.textContent = message.role === "user" ? "You" : "Smile AI";
+
+  const text = document.createElement("div");
+  text.className = "message-text";
+  text.textContent = message.text;
+
+  const time = document.createElement("div");
+  time.className = "message-time";
+  time.textContent = formatTime(message.timestamp);
+
+  content.append(name, text, time);
+
+  if (message.role === "assistant") {
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+
+    const copy = document.createElement("button");
+    copy.textContent = "Copy";
+
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(message.text);
+        copy.textContent = "Copied!";
+        setTimeout(() => copy.textContent = "Copy", 1200);
+      } catch {
+        showNotice("Copy isn't available in this browser.");
+      }
+    });
+
+    const speak = document.createElement("button");
+    speak.textContent = "🔊 Read aloud";
+
+    speak.addEventListener("click", () => speakText(message.text));
+
+    actions.append(copy, speak);
+    content.appendChild(actions);
+  }
+
+  wrapper.append(avatar, content);
+  elements.messages.appendChild(wrapper);
+}
+
+function renderChat() {
+  elements.messages.replaceChildren();
+
+  const chat = currentChat();
+
+  if (!chat || chat.messages.length === 0) {
+    elements.messages.appendChild(elements.welcome);
+    elements.welcome.classList.remove("hidden");
+    return;
+  }
+
+  elements.welcome.classList.add("hidden");
+
+  chat.messages.forEach((message, index) => {
+    addMessageElement(message, index);
+  });
+
+  scrollToBottom();
+}
+
+function addMessage(role, text) {
+  const chat = ensureChat();
+
+  const message = {
+    role,
+    text,
+    timestamp: Date.now()
+  };
+
+  chat.messages.push(message);
+  chat.updatedAt = Date.now();
+
+  if (role === "user" && chat.title === "New conversation") {
+    chat.title = text.slice(0, 38) +
+      (text.length > 38 ? "..." : "");
+  }
+
+  saveChats();
+  renderHistory();
+  renderChat();
+
+  return message;
+}
+
+function setLoading(loading) {
+  isSending = loading;
+  elements.send.disabled = loading;
+  elements.input.disabled = loading;
+  elements.send.textContent = loading ? "Thinking..." : "Send ↑";
+  setStatus(loading ? "Thinking" : "Ready");
+}
+
+function showTyping() {
+  const wrapper = document.createElement("article");
+  wrapper.className = "message";
+  wrapper.id = "typingIndicator";
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = "😊";
+
+  const content = document.createElement("div");
+  content.className = "message-content typing";
+  content.textContent = "Smile AI is thinking...";
+
+  wrapper.append(avatar, content);
+  elements.messages.appendChild(wrapper);
+
+  scrollToBottom();
+}
+
+function removeTyping() {
+  $("typingIndicator")?.remove();
+}
+
+function buildHistory(chat) {
+  return (chat?.messages || [])
+    .slice(-20)
+    .filter(message =>
+      ["user", "assistant"].includes(message.role)
+    )
+    .map(message => ({
+      role: message.role,
+      text: message.text
+    }));
+}
+
+async function sendMessage(text) {
+  text = String(text || "").trim();
+
+  if (!text || isSending) return;
+
+  hideNotice();
+  ensureChat();
+
+  const chat = currentChat();
+
+  addMessage("user", text);
+
+  elements.input.value = "";
+  elements.input.style.height = "auto";
+
+  setLoading(true);
+  showTyping();
+
   try {
-    const message = req.body.message;
-
-    const history = Array.isArray(req.body.history)
-      ? req.body.history
-      : [];
-
-    const memories =
-      req.body.memories &&
-      typeof req.body.memories === "object"
-        ? req.body.memories
-        : {};
-
-    if (!message) {
-      return res.status(400).json({
-        error: "Please send a message."
-      });
-    }
-
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "Gemini API key is missing on the server."
-      });
-    }
-
-    const systemInstruction = `
-You are Smile AI, a smart, friendly and intelligent AI assistant.
-
-Your name is Smile AI.
-
-PERSONALITY:
-- Be friendly and natural.
-- Be intelligent and helpful.
-- Be slightly funny when appropriate.
-- Never force jokes.
-- Do not pretend to be human.
-- Never invent facts.
-- If you don't know something, say so.
-
-LANGUAGE:
-- Understand normal English.
-- Understand Nigerian English.
-- Understand Nigerian Pidgin.
-- Match the user's speaking style naturally.
-- Do not force slang or Pidgin.
-- Use clear English for school, technical and serious topics.
-
-MEMORY:
-Use saved memories when relevant.
-Never invent memories.
-If the newest user message conflicts with an old memory, trust the newest statement.
-
-SAVED MEMORIES:
-${JSON.stringify(memories, null, 2)}
-`;
-
-    const safeHistory = history
-      .slice(-20)
-      .map(item => {
-        const role =
-          item.role === "assistant"
-            ? "Smile AI"
-            : "User";
-
-        return `${role}: ${String(item.content || "")}`;
+    const response = await fetch(BACKEND_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: text,
+        history: buildHistory(chat),
+        memories
       })
-      .join("\n");
-
-    const prompt = `
-${systemInstruction}
-
-RECENT CONVERSATION:
-
-${safeHistory || "No previous conversation."}
-
-LATEST USER MESSAGE:
-
-${message}
-
-Answer naturally.
-`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash-lite",
-      contents: prompt
     });
 
-    res.json({
-      reply:
-        response.text ||
-        "I'm here. What would you like to do?"
-    });
+    let data;
+
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(
+        "The server returned an invalid response. Check your Render logs."
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || `Server error (${response.status})`);
+    }
+
+    const reply = data.reply || data.response;
+
+    if (!reply) {
+      throw new Error("Smile AI returned an empty response.");
+    }
+
+    removeTyping();
+    addMessage("assistant", reply);
+
+    if (data.memories && typeof data.memories === "object") {
+      memories = {
+        ...memories,
+        ...data.memories
+      };
+
+      saveMemories();
+    }
+
+    if (voiceReplies) {
+      speakText(reply);
+    }
 
   } catch (error) {
-    console.error("GEMINI CHAT ERROR:", error);
+    removeTyping();
 
-    res.status(500).json({
-      error:
-        error.message ||
-        "Smile AI could not respond."
-    });
+    console.error("Smile AI error:", error);
+
+    let explanation = error.message || "Unknown error.";
+
+    if (error instanceof TypeError) {
+      explanation =
+        "Could not reach Smile AI. Check your internet connection and confirm that the Render backend is running.";
+    }
+
+    addMessage(
+      "assistant",
+      "Sorry, something went wrong. 😕\n\n" + explanation
+    );
+
+  } finally {
+    setLoading(false);
+    elements.input.disabled = false;
+    elements.input.focus();
+  }
+}
+
+elements.form.addEventListener("submit", event => {
+  event.preventDefault();
+  sendMessage(elements.input.value);
+});
+
+elements.input.addEventListener("keydown", event => {
+  if (
+    event.key === "Enter" &&
+    !event.shiftKey &&
+    !event.isComposing
+  ) {
+    event.preventDefault();
+
+    if (!isSending) {
+      sendMessage(elements.input.value);
+    }
   }
 });
 
-app.post("/image", async (req, res) => {
-  try {
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "Gemini API key is missing on the server."
-      });
-    }
+elements.input.addEventListener("input", () => {
+  elements.input.style.height = "auto";
 
-    const prompt =
-      String(req.body.prompt || "").trim();
-
-    const image =
-      req.body.image;
-
-    if (!prompt) {
-      return res.status(400).json({
-        error: "Please describe the image you want."
-      });
-    }
-
-    const faceProtection = `
-If an input image contains a person:
-
-- Preserve the person's identity.
-- Preserve facial structure and proportions.
-- Preserve eyes, nose, mouth and jaw structure.
-- Preserve skin tone unless specifically requested.
-- Do not replace the person's face.const express = require("express");
-const cors = require("cors");
-const { GoogleGenAI } = require("@google/genai");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-const apiKey = process.env.GEMINI_API_KEY;
-
-if (!apiKey) {
-  console.error("GEMINI_API_KEY is missing!");
-}
-
-const ai = new GoogleGenAI({
-  apiKey: apiKey
+  elements.input.style.height =
+    Math.min(elements.input.scrollHeight, 150) + "px";
 });
 
-app.use(cors());
-
-app.use(express.json({
-  limit: "25mb"
-}));
-
-app.get("/", (req, res) => {
-  res.json({
-    message: "Smile AI is running! 🤖😊"
+document.querySelectorAll(".suggestion").forEach(button => {
+  button.addEventListener("click", () => {
+    sendMessage(button.textContent.replace(/^[^ ]+ /, ""));
   });
 });
 
-app.post("/chat", async (req, res) => {
-  try {
-    const message = req.body.message;
+elements.newChat.addEventListener("click", () => {
+  createChat();
+  elements.sidebar.classList.remove("open");
+  elements.input.focus();
+});
 
-    const history = Array.isArray(req.body.history)
-      ? req.body.history
-      : [];
+elements.menu.addEventListener("click", () => {
+  elements.sidebar.classList.toggle("open");
+});
 
-    const memories =
-      req.body.memories &&
-      typeof req.body.memories === "object"
-        ? req.body.memories
-        : {};
+elements.theme.addEventListener("click", () => {
+  const light = document.body.dataset.theme !== "light";
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Please send a message."
-      });
-    }
+  if (light) {
+    document.body.dataset.theme = "light";
 
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "Gemini API key is missing on the server."
-      });
-    }
+    document.documentElement.style.setProperty("--bg", "#f5f6fb");
+    document.documentElement.style.setProperty("--panel", "#ffffff");
+    document.documentElement.style.setProperty("--panel2", "#e9ebf4");
+    document.documentElement.style.setProperty("--text", "#181a25");
+    document.documentElement.style.setProperty("--muted", "#686e7d");
+    document.documentElement.style.setProperty("--border", "#dfe2ec");
+    document.documentElement.style.setProperty("--user", "#e8e4ff");
 
-    const systemInstruction = `
-You are Smile AI, a smart, friendly and intelligent AI assistant.
-
-Your name is Smile AI.
-
-PERSONALITY:
-- Be friendly and natural.
-- Be intelligent and helpful.
-- Be slightly funny when appropriate.
-- Never force jokes.
-- Do not pretend to be human.
-- Never invent facts.
-- If you don't know something, say so.
-
-LANGUAGE:
-- Understand normal English.
-- Understand Nigerian English.
-- Understand Nigerian Pidgin.
-- Match the user's speaking style naturally.
-- Do not force slang or Pidgin.
-- Use clear English for school, technical and serious topics.
-
-MEMORY:
-Use saved memories when relevant.
-Never invent memories.
-If the newest user message conflicts with an old memory, trust the newest statement.
-
-SAVED MEMORIES:
-${JSON.stringify(memories, null, 2)}
-`;
-
-    const safeHistory = history
-      .slice(-20)
-      .map(item => {
-        const role =
-          item.role === "assistant"
-            ? "Smile AI"
-            : "User";
-
-        return `${role}: ${String(item.content || "")}`;
-      })
-      .join("\n");
-
-    const prompt = `
-${systemInstruction}
-
-RECENT CONVERSATION:
-
-${safeHistory || "No previous conversation."}
-
-LATEST USER MESSAGE:
-
-${message}
-
-Answer naturally.
-`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash-lite",
-      contents: prompt
-    });
-
-    res.json({
-      reply:
-        response.text ||
-        "I'm here. What would you like to do?"
-    });
-
-  } catch (error) {
-    console.error("GEMINI CHAT ERROR:", error);
-
-    res.status(500).json({
-      error:
-        error.message ||
-        "Smile AI could not respond."
-    });
+    localStorage.setItem(STORAGE.theme, "light");
+  } else {
+    applyDarkTheme();
   }
 });
 
-app.post("/image", async (req, res) => {
-  try {
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "Gemini API key is missing on the server."
-      });
+function applyDarkTheme() {
+  document.body.dataset.theme = "dark";
+
+  document.documentElement.style.setProperty("--bg", "#090b10");
+  document.documentElement.style.setProperty("--panel", "#11141c");
+  document.documentElement.style.setProperty("--panel2", "#191d28");
+  document.documentElement.style.setProperty("--text", "#f4f5f8");
+  document.documentElement.style.setProperty("--muted", "#9299aa");
+  document.documentElement.style.setProperty("--border", "#282d3a");
+  document.documentElement.style.setProperty("--user", "#292447");
+
+  localStorage.setItem(STORAGE.theme, "dark");
+}
+
+elements.voiceToggle.addEventListener("click", () => {
+  voiceReplies = !voiceReplies;
+
+  localStorage.setItem(STORAGE.voice, String(voiceReplies));
+
+  updateVoiceButton();
+
+  if (!voiceReplies && "speechSynthesis" in window) {
+    speechSynthesis.cancel();
+  }
+});
+
+function updateVoiceButton() {
+  elements.voiceToggle.textContent =
+    voiceReplies ? "🔊 Voice replies: ON" : "🔇 Voice replies: OFF";
+}
+
+function speakText(text) {
+  if (!("speechSynthesis" in window)) {
+    showNotice("Voice replies are not supported by this browser.");
+    return;
+  }
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-NG";
+  utterance.rate = 1;
+  utterance.pitch = 1;
+
+  speechSynthesis.speak(utterance);
+}
+
+elements.stopVoice.addEventListener("click", () => {
+  if ("speechSynthesis" in window) {
+    speechSynthesis.cancel();
+  }
+});
+
+elements.mic.addEventListener("click", () => {
+  const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    showNotice(
+      "Voice input is unavailable in this browser. Try a browser that supports speech recognition."
+    );
+    return;
+  }
+
+  if (recognition) {
+    recognition.stop();
+    recognition = null;
+    elements.mic.textContent = "🎤";
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-NG";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.onstart = () => {
+    elements.mic.textContent = "⏹️";
+    setStatus("Listening");
+  };
+
+  recognition.onresult = event => {
+    let transcript = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
     }
 
-    const prompt =
-      String(req.body.prompt || "").trim();
+    elements.input.value = transcript;
+  };
 
-    const image =
-      req.body.image;
+  recognition.onerror = event => {
+    showNotice("Voice input error: " + event.error);
+  };
 
-    if (!prompt) {
-      return res.status(400).json({
-        error: "Please describe the image you want."
-      });
+  recognition.onend = () => {
+    elements.mic.textContent = "🎤";
+    setStatus("Ready");
+    recognition = null;
+  };
+
+  recognition.start();
+});
+
+elements.memory.addEventListener("click", () => {
+  const fields = [
+    ["name", "Your name"],
+    ["favoriteFootballer", "Favourite footballer"],
+    ["favoriteClub", "Favourite football club"],
+    ["favoriteGame", "Favourite game"],
+    ["favoriteColor", "Favourite colour"]
+  ];
+
+  for (const [key, label] of fields) {
+    const answer = prompt(
+      `${label}:\nLeave blank to keep the current value.`,
+      memories[key] || ""
+    );
+
+    if (answer === null) return;
+
+    if (answer.trim()) {
+      memories[key] = answer.trim();
     }
+  }
 
-    const faceProtection = `
-If an input image contains a person:
+  saveMemories();
 
-- Preserve the person's identity.
-- Preserve facial structure and proportions.
-- Preserve eyes, nose, mouth and jaw structure.
-- Preserve skin tone unless specifically requested.
-- Do not replace the person's face.
-- Keep the person recognizable.
-- Only modify the areas requested by the user.
-`;
+  showNotice("Your saved memories have been updated. 🧠");
+});
 
-    let contents;
+elements.clear.addEventListener("click", () => {
+  const chat = currentChat();
 
-    if (!image) {
-      contents = `${
-- Keep the person recognizable.
-- Only modify the areas requested by the user.
-`;
+  if (!chat) return;
 
-    let contents;
+  if (!confirm("Clear all messages in this conversation?")) {
+    return;
+  }
 
-    if (!image) {
-      contents = `${
+  chat.messages = [];
+  chat.title = "New conversation";
+  chat.updatedAt = Date.now();
+
+  saveChats();
+  renderHistory();
+  renderChat();
+});
+
+function initialize() {
+  const savedTheme = localStorage.getItem(STORAGE.theme);
+
+  if (savedTheme === "light") {
+    document.body.dataset.theme = "dark";
+    elements.theme.click();
+  } else {
+    applyDarkTheme();
+  }
+
+  updateVoiceButton();
+
+  if (!currentChat()) {
+    if (chats.length) {
+      currentChatId = chats[0].id;
+      localStorage.setItem(STORAGE.current, currentChatId);
+    } else {
+      createChat();
+    }
+  }
+
+  renderHistory();
+  renderChat();
+}
+
+initialize();
