@@ -1,38 +1,180 @@
 <!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smile AI</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="app">
-    <header class="header">
-      <div class="logo">😊</div>
-      <div>
-        <h1>Smile AI</h1>
-        <p><span class="online-dot"></span> Your AI friend is online</p>
-      </div>
-    </header><main id="chat">
-  <div class="message ai">
-    <div class="bubble">
-      Heyyy! 🥰 I'm Smile AI, your AI friend. What are we talking about today?
-    </div>
-    <span class="time">Now</span>
-  </div>
-</main>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#03040a"><title>Smile AI</title>
 
-<div class="suggestions">
-  <button onclick="quickSend('Tell me a joke 😂')">😂 Tell me a joke</button>
-  <button onclick="quickSend('Let us talk 🥰')">💬 Let's talk</button>
+<!-- Connect the CSS design -->
+<link rel="stylesheet" href="style.css?v=2">
+
+<style>
+    /* Basic fallback design if style.css has a loading problem */
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #03040a;
+        color: #f0f5ff;
+    }
+
+    .app {
+        width: 100%;
+        max-width: 850px;
+        height: 100dvh;
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    header {
+        padding: 18px;
+        border-bottom: 1px solid #17334a;
+        background: #080d19;
+    }
+
+    header h1 {
+        margin: 0;
+        color: #00e5ff;
+    }
+
+    header p {
+        margin: 6px 0 0;
+        color: #8997b5;
+        font-size: 13px;
+    }
+
+    #chat {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px;
+    }
+
+    .message {
+        margin: 12px 0;
+        padding: 13px 15px;
+        border-radius: 15px;
+        max-width: 85%;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    .bot {
+        background: #101b2c;
+        border: 1px solid #16445a;
+        margin-right: auto;
+    }
+
+    .user {
+        background: #123e58;
+        border: 1px solid #00a9d4;
+        margin-left: auto;
+    }
+
+    .time {
+        display: block;
+        margin-top: 6px;
+        font-size: 10px;
+        color: #8997b5;
+    }
+
+    .suggestions {
+        display: flex;
+        gap: 8px;
+        padding: 0 12px 12px;
+        overflow-x: auto;
+    }
+
+    .suggestions button {
+        flex-shrink: 0;
+        background: #101b2c;
+        border: 1px solid #00a9d4;
+        color: #00e5ff;
+        padding: 9px 12px;
+        border-radius: 20px;
+    }
+
+    form {
+        display: flex;
+        gap: 8px;
+        padding: 12px;
+        background: #080d19;
+        border-top: 1px solid #17334a;
+    }
+
+    #messageInput {
+        flex: 1;
+        min-width: 0;
+        padding: 13px;
+        border-radius: 25px;
+        border: 1px solid #29445e;
+        background: #101725;
+        color: white;
+        outline: none;
+    }
+
+    #sendButton {
+        padding: 0 18px;
+        border: none;
+        border-radius: 25px;
+        background: #00cce8;
+        color: #03040a;
+        font-weight: bold;
+    }
+
+    button {
+        cursor: pointer;
+    }
+
+    #status {
+        color: #8997b5;
+        font-size: 12px;
+    }
+</style>
+
+</head><body>
+    <div class="app">    <header>
+        <h1>😊 Smile AI</h1>
+        <p>● Your AI friend is online</p>
+        <p id="status">Ready to chat ✨</p>
+    </header>
+
+    <main id="chat" aria-live="polite">
+        <div class="message bot">
+            Heyyy! 🥰 I'm Smile AI, your AI friend. What are we talking about today?
+            <span class="time">Now</span>
+        </div>
+    </main>
+
+    <div class="suggestions">
+        <button type="button" onclick="askSuggestion('Tell me something funny 😂')">
+            😂 Tell me a joke
+        </button>
+
+        <button type="button" onclick="askSuggestion('What do you know about football? ⚽')">
+            ⚽ Football
+        </button>
+
+        <button type="button" onclick="askSuggestion('Give me some life advice')">
+            💭 Life advice
+        </button>
+    </div>
+
+    <form id="chatForm">
+        <input
+            id="messageInput"
+            type="text"
+            placeholder="Message Smile AI..."
+            autocomplete="off"
+            required
+        >
+
+        <button id="sendButton" type="submit">Send ➤</button>
+    </form>
+
 </div>
 
-<form id="chat-form">
-  <input id="user-input" type="text" placeholder="Message Smile AI..." autocomplete="off" required>
-  <button id="send-btn" type="submit">➤</button>
-</form>
+<!-- Connect the JavaScript -->
+<script src="script.js"></script>
 
-<footer>Made with ❤️ by Smile</footer>
-
-  </div>  <script src="script.js"></script></body>
+</body>
 </html>
