@@ -1,235 +1,270 @@
 const express = require("express");
 const cors = require("cors");
-const { GoogleGenAI } = require("@google/genai");
 
 const app = express();
-
-const PORT = process.env.PORT || 10000;
-const API_KEY = process.env.GEMINI_API_KEY;
-
-// CORRECT MODEL DECLARATION
-const MODEL = "gemini-3.5-flash-lite";
-
-const ai = API_KEY
-    ? new GoogleGenAI({ apiKey: API_KEY })
-    : null;
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+const PORT = process.env.PORT || 10000;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Gemini model with Google Search grounding
+const MODEL = "gemini-3.8-flash";
+
 const SYSTEM_PROMPT = `
 You are Smile AI, a friendly, intelligent, funny and helpful AI assistant.
 
-PERSONALITY:
-- Be warm, natural and conversational.
-- Use emojis naturally.
+YOUR PERSONALITY:
+- Be friendly, natural, and conversational.
+- You may use emojis when appropriate.
 - Understand Nigerian English and Nigerian Pidgin.
-- Explain schoolwork clearly.
-- Give useful and direct answers.
+- Match the user's tone.
+- Explain difficult things simply.
 - Be honest when you do not know something.
-- Never pretend to perform actions you cannot perform.
 
-IDENTITY:
-- Your name is Smile AI.
-- Your creator is Smile.
-- You are an AI assistant that helps people learn, chat and solve problems.
+CURRENT INFORMATION:
+- Use the current date and time supplied with each request.
+- The current year is determined by that date, not your training data.
+- Never assume that your training data represents today's information.
+- Search the internet when current information would improve your answer.
+- Search when asked about recent events, football, scores, transfers,
+  celebrities, technology, games, prices, weather, or breaking news.
+- Search for other topics too whenever useful.
+- Do not invent search results, scores, news, dates, or facts.
+- Clearly say when information cannot be verified.
+- Distinguish old information from current information.
 
 CONVERSATION:
-- Pay attention to the conversation history.
-- Remember context from earlier messages in the current conversation.
-- Answer the latest message directly.
-- Keep simple answers concise.
+- Pay attention to the conversation history provided by the server.
+- Remember facts stated earlier in the available conversation.
+- Do not claim to remember information that is not available.
+- Answer the user's actual question directly.
+
+FOOTBALL:
+- Treat football questions seriously.
+- Use current information for recent matches, standings, transfers,
+  injuries, and team news when available.
+- Never invent live scores.
+
+PRIVACY AND SECURITY:
+- Never reveal API keys or server secrets.
+- Do not claim you performed an action that you did not perform.
 `;
 
-const sleep = ms =>
-    new Promise(resolve => setTimeout(resolve, ms));
-
-function getStatus(error) {
-    return Number(
-        error.status ||
-        error.code ||
-        error.error?.code
-    ) || 500;
+function getNigeriaDateTime() {
+    return new Intl.DateTimeFormat("en-NG", {
+        dateStyle: "full",
+        timeStyle: "short",
+        timeZone: "Africa/Lagos"
+    }).format(new Date());
 }
 
-// Retry temporary errors only once to reduce waiting time.
-async function generateReply(contents) {
-    try {
-        return await ai.models.generateContent({
-            model: MODEL,
-            contents,
-            config: {
-                systemInstruction: SYSTEM_PROMPT,
-                temperature: 0.7,
-                maxOutputTokens: 1024
-            }
-        });
-    } catch (error) {
-        const status = getStatus(error);
-
-        console.error(
-            "Gemini request failed:",
-            error.message
-        );
-
-        if (![408, 429, 500, 502, 503, 504].includes(status)) {
-            throw error;
-        }
-
-        console.log("Retrying Gemini request once...");
-
-        await sleep(1200);
-
-        return await ai.models.generateContent({
-            model: MODEL,
-            contents,
-            config: {
-                systemInstruction: SYSTEM_PROMPT,
-                temperature: 0.7,
-                maxOutputTokens: 1024
-            }
-        });
+function formatHistory(history) {
+    if (!Array.isArray(history)) {
+        return "";
     }
+
+    return history
+        .slice(-15)
+        .map((item) => {
+            const role =
+                item.role === "assistant" ||
+                item.role === "model" ||
+                item.sender === "assistant"
+                    ? "Smile AI"
+                    : "User";
+
+            const content =
+                item.content ??
+                item.text ??
+                item.message ??
+                item.parts?.[0]?.text ??
+                "";
+
+            if (typeof content !== "string" || !content.trim()) {
+                return "";
+            }
+
+            return `${role}: ${content.trim()}`;
+        })
+        .filter(Boolean)
+        .join("\n");
 }
 
-// Service status
 app.get("/", (req, res) => {
     res.json({
         name: "Smile AI",
         status: "online",
-        model: MODEL
+        message: "Your AI friend is online."
     });
 });
 
-// Health check
 app.get("/health", (req, res) => {
     res.json({
         status: "ok",
         service: "Smile AI",
         model: MODEL,
-        configured: Boolean(API_KEY)
+        configured: Boolean(GEMINI_API_KEY),
+        liveSearch: true
     });
 });
 
-// Chat endpoint
 app.post("/chat", async (req, res) => {
     try {
-        if (!ai) {
+        if (!GEMINI_API_KEY) {
             return res.status(500).json({
-                error: "Gemini API key is missing on the server."
+                reply:
+                    "My brain isn't connected yet 😭. " +
+                    "Please check the GEMINI_API_KEY setting on the server."
             });
         }
 
         const message = req.body?.message;
+        const history = req.body?.history;
 
-        if (
-            typeof message !== "string" ||
-            !message.trim()
-        ) {
+        if (typeof message !== "string" || !message.trim()) {
             return res.status(400).json({
-                error: "Please enter a message."
+                reply: "Oya, send me a message first 😅❤️"
             });
         }
 
-        let history = Array.isArray(req.body.history)
-            ? req.body.history
-            : [];
+        const dateTime = getNigeriaDateTime();
+        const conversationHistory = formatHistory(history);
 
-        history = history
-            .filter(item =>
-                item &&
-                typeof item.content === "string" &&
-                ["user", "assistant", "model"].includes(item.role)
-            )
-            .slice(-20)
-            .map(item => ({
-                role:
-                    item.role === "assistant"
-                        ? "model"
-                        : item.role,
-                parts: [{
-                    text: item.content.slice(0, 8000)
-                }]
-            }));
+        const input = `
+CURRENT DATE AND TIME IN NIGERIA:
+${dateTime}
 
-        // Prevent sending the current message twice.
-        const last = history[history.length - 1];
+PREVIOUS CONVERSATION:
+${conversationHistory || "No previous conversation supplied."}
 
-        if (
-            last &&
-            last.role === "user" &&
-            last.parts[0].text.trim() === message.trim()
-        ) {
-            history.pop();
+NEW USER MESSAGE:
+${message.trim()}
+
+Respond naturally to the new user message.
+Use Google Search when current information would help.
+`;
+
+        const controller = new AbortController();
+
+        const timeout = setTimeout(() => {
+            controller.abort();
+        }, 55000);
+
+        let response;
+
+        try {
+            response = await fetch(
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": GEMINI_API_KEY
+                    },
+                    body: JSON.stringify({
+                        model: MODEL,
+                        input,
+                        system_instruction: SYSTEM_PROMPT,
+                        tools: [
+                            {
+                                type: "google_search"
+                            }
+                        ],
+                        store: false
+                    }),
+                    signal: controller.signal
+                }
+            );
+        } finally {
+            clearTimeout(timeout);
         }
 
-        const contents = [
-            ...history,
-            {
-                role: "user",
-                parts: [{
-                    text: message.trim()
-                }]
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error(
+                "Gemini API error:",
+                response.status,
+                JSON.stringify(data)
+            );
+
+            if (response.status === 400) {
+                return res.status(502).json({
+                    reply:
+                        "My live-search brain hit an API configuration " +
+                        "problem 😭. Check the Render logs for the exact error."
+                });
             }
-        ];
 
-        const result = await generateReply(contents);
-        const reply = result.text;
+            if (response.status === 401 || response.status === 403) {
+                return res.status(502).json({
+                    reply:
+                        "I can't access my AI brain right now 🔑. " +
+                        "The API key or search permissions may need fixing."
+                });
+            }
 
-        if (
-            typeof reply !== "string" ||
-            !reply.trim()
-        ) {
+            if (response.status === 429) {
+                return res.status(503).json({
+                    reply:
+                        "Too many requests or my free API limit has been " +
+                        "reached 😭. Please try again later."
+                });
+            }
+
             return res.status(502).json({
-                error: "Gemini returned an empty reply. Please try again."
+                reply:
+                    "My AI service is having a problem right now 😕. " +
+                    "Please try again shortly."
             });
         }
 
-        console.log("Smile AI replied successfully.");
+        const reply =
+            data.output_text ||
+            data.outputText ||
+            "";
+
+        if (!reply.trim()) {
+            console.error(
+                "Gemini returned no output text:",
+                JSON.stringify(data)
+            );
+
+            return res.status(502).json({
+                reply:
+                    "I received an empty response from my AI brain 😭. " +
+                    "Please send your message again."
+            });
+        }
 
         return res.json({
             reply: reply.trim(),
-            model: MODEL,
-            status: "success"
+            model: MODEL
         });
 
     } catch (error) {
-        console.error(
-            "Smile AI chat error:",
-            error.message
-        );
+        console.error("Chat error:", error);
 
-        const status = getStatus(error);
-
-        if ([429, 503, 504].includes(status)) {
-            return res.status(503).json({
-                error: "Smile AI is temporarily busy. Please try again shortly."
-            });
-        }
-
-        if (status === 404) {
-            return res.status(502).json({
-                error: "The Gemini model is unavailable. Check the model name."
+        if (error.name === "AbortError") {
+            return res.status(504).json({
+                reply:
+                    "That request took too long 😭. " +
+                    "Please try asking again."
             });
         }
 
         return res.status(500).json({
-            error: "Smile AI encountered a server error.",
-            details: error.message || "Unknown error"
+            reply:
+                "Something went wrong while I was thinking 😕. " +
+                "Please try again."
         });
     }
 });
 
-// Unknown routes
-app.use((req, res) => {
-    res.status(404).json({
-        error: "Route not found."
-    });
-});
-
-// Start server
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Smile AI running on port ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`Smile AI is running on port ${PORT}`);
     console.log(`Model: ${MODEL}`);
-    console.log(`Gemini API configured: ${Boolean(API_KEY)}`);
+    console.log(`Google Search grounding enabled`);
 });
