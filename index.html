@@ -3,45 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#090b10">
   <title>Smile AI</title>
 
   <style>
+    :root {
+      --bg: #090b10;
+      --panel: #11141c;
+      --panel2: #191d28;
+      --text: #f4f5f8;
+      --muted: #9299aa;
+      --accent: #8b7cff;
+      --border: #282d3a;
+      --user: #292447;
+    }
+
     * {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    :root {
-      --bg: #f5f7fb;
-      --card: #ffffff;
-      --text: #111827;
-      --muted: #6b7280;
-      --border: #e5e7eb;
-      --blue: #2563eb;
-      --assistant: #eef1f5;
-    }
-
-    body.dark {
-      --bg: #0b0f17;
-      --card: #111827;
-      --text: #f9fafb;
-      --muted: #9ca3af;
-      --border: #263244;
-      --assistant: #1f2937;
     }
 
     body {
       margin: 0;
-      min-height: 100vh;
+      height: 100dvh;
       background: var(--bg);
       color: var(--text);
       font-family: Arial, sans-serif;
+      display: flex;
+      overflow: hidden;
     }
 
-    button,
-    input {
+    button, textarea, input {
       font: inherit;
     }
 
@@ -49,1883 +40,446 @@
       cursor: pointer;
     }
 
-    .app {
+    .sidebar {
+      width: 260px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .brand {
+      font-size: 25px;
+      font-weight: bold;
+      margin: 8px 0 18px;
+    }
+
+    .brand span {
+      color: var(--accent);
+    }
+
+    .new-chat, .side-button {
       width: 100%;
-      max-width: 1000px;
-      height: 100vh;
-      margin: auto;
+      padding: 13px;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--text);
+      border-radius: 12px;
+      text-align: left;
+    }
+
+    .new-chat:hover, .side-button:hover {
+      border-color: var(--accent);
+    }
+
+    .history-title {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 14px;
+    }
+
+    .history-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .history-item {
+      padding: 10px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 13px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .history-item:hover {
+      background: var(--panel2);
+    }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      display: grid;
+      gap: 9px;
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
     }
 
-    /* HEADER */
-
-    header {
-      height: 64px;
-      padding: 0 15px;
+    .topbar {
+      height: 65px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .logo {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: var(--blue);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 21px;
-    }
-
-    .brand-name {
+    .top-title {
       font-weight: bold;
-      font-size: 17px;
+      font-size: 16px;
     }
 
-    .online {
-      color: #22c55e;
-      font-size: 11px;
-      margin-top: 2px;
+    .status {
+      font-size: 12px;
+      color: var(--muted);
     }
 
-    .controls {
-      display: flex;
-      gap: 4px;
+    .status::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      background: #43d49a;
+      border-radius: 50%;
+      margin-right: 7px;
     }
 
-    .icon-btn {
-      width: 38px;
-      height: 38px;
-      border: 0;
-      border-radius: 10px;
+    .mobile-menu {
+      display: none;
       background: transparent;
       color: var(--text);
-      font-size: 18px;
+      border: none;
+      font-size: 22px;
     }
 
-    .icon-btn:hover {
-      background: var(--assistant);
-    }
-
-    /* CHAT */
-
-    #chat {
+    .messages {
       flex: 1;
       overflow-y: auto;
-      padding: 20px 15px;
+      padding: 25px 16px;
+      scroll-behavior: smooth;
     }
-
-    /* WELCOME */
 
     .welcome {
-      min-height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      max-width: 650px;
+      margin: 9vh auto 30px;
       text-align: center;
-      padding: 20px;
     }
 
-    .welcome-box {
-      max-width: 600px;
-      width: 100%;
-    }
-
-    .big-logo {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 18px;
+    .logo-circle {
+      width: 70px;
+      height: 70px;
       border-radius: 24px;
-      background: var(--blue);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 42px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #8b7cff, #5143ba);
+      margin: 0 auto 20px;
+      font-size: 35px;
     }
 
     .welcome h1 {
-      font-size: 42px;
-      margin-bottom: 10px;
-    }
-
-    .welcome h1 span {
-      color: var(--blue);
+      font-size: clamp(27px, 5vw, 40px);
+      margin: 10px 0;
     }
 
     .welcome p {
       color: var(--muted);
       line-height: 1.6;
-      font-size: 15px;
-    }
-
-    .try-text {
-      margin-top: 28px;
-      margin-bottom: 12px;
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
     }
 
     .suggestions {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 28px;
     }
 
     .suggestion {
-      padding: 10px 13px;
+      background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      background: var(--card);
+      border-radius: 13px;
       color: var(--text);
+      padding: 14px;
+      text-align: left;
+      line-height: 1.5;
     }
 
     .suggestion:hover {
-      border-color: var(--blue);
+      border-color: var(--accent);
     }
-
-    /* MESSAGES */
 
     .message {
+      max-width: 850px;
+      margin: 0 auto 22px;
       display: flex;
-      margin-bottom: 16px;
+      gap: 12px;
+      align-items: flex-start;
     }
 
-    .message.user {
-      justify-content: flex-end;
+    .avatar {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      background: var(--panel2);
+      font-size: 16px;
     }
 
-    .message.assistant {
-      justify-content: flex-start;
+    .message.user .avatar {
+      background: var(--user);
     }
 
-    .message-box {
-      max-width: 82%;
+    .message-content {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.75;
+      overflow-wrap: anywhere;
     }
 
-    .bubble {
-      padding: 12px 15px;
-      border-radius: 18px;
-      line-height: 1.55;
-      font-size: 15px;
+    .message-name {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .message-text {
       white-space: pre-wrap;
-      word-wrap: break-word;
+      font-size: 15px;
     }
 
-    .user .bubble {
-      background: var(--blue);
-      color: white;
-      border-bottom-right-radius: 5px;
-    }
-
-    .assistant .bubble {
-      background: var(--assistant);
-      color: var(--text);
-      border-bottom-left-radius: 5px;
-    }
-
-    .time {
-      font-size: 10px;
+    .message-time {
       color: var(--muted);
-      margin-top: 4px;
+      font-size: 11px;
+      margin-top: 7px;
     }
 
-    .user .time {
-      text-align: right;
+    .message-actions {
+      display: flex;
+      gap: 7px;
+      margin-top: 8px;
     }
 
-    /* IMAGE */
-
-    .ai-image {
-      display: block;
-      width: 100%;
-      max-width: 500px;
-      height: auto;
-      border-radius: 14px;
-      margin-bottom: 10px;
+    .message-actions button {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 5px 9px;
+      border-radius: 7px;
+      font-size: 12px;
     }
-
-    .image-bubble {
-      padding: 8px;
-    }
-
-    .image-caption {
-      padding: 5px 5px 2px;
-    }
-
-    /* TYPING */
 
     .typing {
-      display: inline-flex;
-      gap: 5px;
-      padding: 13px 16px;
-      border-radius: 18px;
-      background: var(--assistant);
+      color: var(--muted);
+      animation: pulse 1s infinite;
     }
 
-    .dot {
-      width: 7px;
-      height: 7px;
-      background: var(--muted);
-      border-radius: 50%;
-      animation: bounce 1s infinite;
+    @keyframes pulse {
+      50% { opacity: .4; }
     }
 
-    .dot:nth-child(2) {
-      animation-delay: .15s;
-    }
-
-    .dot:nth-child(3) {
-      animation-delay: .3s;
-    }
-
-    @keyframes bounce {
-      0%, 60%, 100% {
-        transform: translateY(0);
-      }
-
-      30% {
-        transform: translateY(-5px);
-      }
-    }
-
-    /* INPUT */
-
-    .input-area {
-      padding: 10px 12px 14px;
-      background: var(--card);
+    .composer-area {
+      padding: 12px 16px 8px;
       border-top: 1px solid var(--border);
+    }
+
+    .composer {
+      max-width: 850px;
+      margin: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 10px;
+    }
+
+    .composer textarea {
+      width: 100%;
+      min-height: 45px;
+      max-height: 150px;
+      resize: none;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      padding: 9px;
+      line-height: 1.5;
+    }
+
+    .composer-buttons {
       display: flex;
+      align-items: center;
+      justify-content: space-between;
       gap: 8px;
     }
 
-    #messageInput {
-      flex: 1;
-      min-width: 0;
-      height: 48px;
-      padding: 0 17px;
+    .tools {
+      display: flex;
+      gap: 7px;
+    }
+
+    .tool-button {
+      background: var(--panel2);
+      color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 25px;
-      outline: none;
-      background: var(--assistant);
-      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 10px;
     }
 
-    #messageInput:focus {
-      border-color: var(--blue);
-    }
-
-    .action {
-      width: 48px;
-      height: 48px;
-      flex-shrink: 0;
-      border: 0;
-      border-radius: 50%;
-      font-size: 18px;
-    }
-
-    .voice,
-    .image-btn {
-      background: var(--assistant);
-      color: var(--text);
-    }
-
-    .voice.listening {
-      background: #ef4444;
+    .send-button {
+      background: var(--accent);
       color: white;
+      border: none;
+      padding: 10px 17px;
+      border-radius: 11px;
+      font-weight: bold;
     }
 
-    .send {
-      background: var(--blue);
-      color: white;
+    .send-button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
     }
 
-    .footer {
-      background: var(--card);
-      text-align: center;
+    .footer-note {
+      max-width: 850px;
+      margin: 9px auto 0;
       color: var(--muted);
-      font-size: 10px;
-      padding-bottom: 7px;
+      text-align: center;
+      font-size: 11px;
     }
 
-    /* IMAGE PREVIEW */
-
-    #imagePreview {
-      display: none;
-      padding: 8px 12px;
-      background: var(--card);
-      border-top: 1px solid var(--border);
+    .hidden {
+      display: none !important;
     }
 
-    #imagePreviewBox {
-      position: relative;
-      display: inline-block;
-    }
-
-    #previewImage {
-      width: 70px;
-      height: 70px;
-      object-fit: cover;
-      border-radius: 12px;
-      border: 2px solid var(--blue);
-    }
-
-    #removeImageBtn {
-      position: absolute;
-      top: -7px;
-      right: -7px;
-      width: 23px;
-      height: 23px;
-      border: 0;
-      border-radius: 50%;
-      background: #ef4444;
-      color: white;
+    .notice {
+      max-width: 850px;
+      margin: 0 auto 14px;
+      background: #34251c;
+      border: 1px solid #67472d;
+      color: #ffd5a9;
+      padding: 11px;
+      border-radius: 10px;
       font-size: 13px;
     }
 
-    @media (max-width: 600px) {
-
-      .welcome h1 {
-        font-size: 36px;
+    @media (max-width: 700px) {
+      .sidebar {
+        position: fixed;
+        z-index: 10;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+        box-shadow: none;
       }
 
-      .big-logo {
-        width: 70px;
-        height: 70px;
-        font-size: 36px;
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 10px 0 40px #0009;
       }
 
-      .message-box {
-        max-width: 88%;
+      .mobile-menu {
+        display: block;
       }
 
-      .bubble {
-        font-size: 14px;
+      .topbar {
+        padding: 0 13px;
+        gap: 12px;
       }
 
-      .action {
-        width: 45px;
-        height: 45px;
+      .welcome {
+        margin-top: 5vh;
       }
 
-      #messageInput {
-        height: 45px;
+      .suggestions {
+        grid-template-columns: 1fr;
+      }
+
+      .messages {
+        padding: 20px 12px;
+      }
+
+      .composer-area {
+        padding: 10px;
+      }
+
+      .tool-button {
+        padding: 9px;
       }
     }
   </style>
 </head>
 
 <body>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">Smile <span>AI</span> ✨</div>
 
-  <div class="app">
+    <button class="new-chat" id="newChatBtn">＋ New chat</button>
 
-    <!-- HEADER -->
+    <div class="history-title">RECENT CHATS</div>
+    <div class="history-list" id="historyList"></div>
 
-    <header>
+    <div class="sidebar-bottom">
+      <button class="side-button" id="themeBtn">🌙 Toggle theme</button>
+      <button class="side-button" id="voiceToggleBtn">🔊 Voice replies: ON</button>
+      <button class="side-button" id="memoryBtn">🧠 My memories</button>
+      <button class="side-button" id="clearBtn">🗑️ Clear current chat</button>
+    </div>
+  </aside>
 
-      <div class="brand">
-
-        <div class="logo">
-          😊
-        </div>
-
-        <div>
-
-          <div class="brand-name">
-            Smile AI
-          </div>
-
-          <div class="online">
-            ● Online
-          </div>
-
-        </div>
-
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="mobile-menu" id="menuBtn" aria-label="Open menu">☰</button>
+        <div class="top-title">Smile AI <span style="color:var(--accent)">✦</span></div>
       </div>
 
-      <div class="controls">
-
-        <button
-          class="icon-btn"
-          id="themeBtn"
-          onclick="toggleTheme()"
-        >
-          🌙
-        </button>
-
-        <button
-          class="icon-btn"
-          id="voiceReplyBtn"
-          onclick="toggleVoiceReplies()"
-        >
-          🔊
-        </button>
-
-        <button
-          class="icon-btn"
-          onclick="clearChat()"
-        >
-          🗑️
-        </button>
-
-      </div>
-
+      <div class="status" id="connectionStatus">Ready</div>
     </header>
 
+    <section class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="logo-circle">😊</div>
+        <h1>Hey, I'm Smile AI.</h1>
+        <p>Your personal AI assistant. Ask questions, learn something new, or just talk to me.</p>
 
-    <!-- CHAT -->
-
-    <div id="chat">
-
-      <div
-        class="welcome"
-        id="welcome"
-      >
-
-        <div class="welcome-box">
-
-          <div class="big-logo">
-            😊
-          </div>
-
-          <h1>
-            Meet <span>Smile AI</span>
-          </h1>
-
-          <p>
-            Your smart AI assistant for questions,
-            coding, learning, creativity, image creation
-            and image editing.
-          </p>
-
-          <div class="try-text">
-            Try asking
-          </div>
-
-          <div class="suggestions">
-
-            <button
-              class="suggestion"
-              onclick="usePrompt('What can you do?')"
-            >
-              🤖 What can you do?
-            </button>
-
-            <button
-              class="suggestion"
-              onclick="usePrompt('Help me learn coding')"
-            >
-              💻 Help me learn coding
-            </button>
-
-            <button
-              class="suggestion"
-              onclick="usePrompt('Create an image of a futuristic city at night')"
-            >
-              🎨 Create an image
-            </button>
-
-            <button
-              class="suggestion"
-              onclick="usePrompt('Tell me something interesting')"
-            >
-              🧠 Something interesting
-            </button>
-
-            <button
-              class="suggestion"
-              onclick="usePrompt('Give me a football fact')"
-            >
-              ⚽ Football fact
-            </button>
-
-          </div>
-
+        <div class="suggestions">
+          <button class="suggestion">📚 Explain a difficult school topic</button>
+          <button class="suggestion">💻 Help me build a website</button>
+          <button class="suggestion">⚽ Tell me something about football</button>
+          <button class="suggestion">✨ Give me creative ideas</button>
         </div>
-
       </div>
-
-    </div>
-
-
-    <!-- IMAGE PREVIEW -->
-
-    <div id="imagePreview">
-
-      <div id="imagePreviewBox">
-
-        <img
-          id="previewImage"
-          src=""
-          alt="Selected image"
-        >
-
-        <button
-          id="removeImageBtn"
-          onclick="removeSelectedImage()"
-        >
-          ×
-        </button>
-
-      </div>
-
-    </div>
-
-
-    <!-- INPUT -->
-
-    <div class="input-area">
-
-      <input
-        type="file"
-        id="imagePicker"
-        accept="image/png,image/jpeg,image/webp"
-        style="display:none"
-      >
-
-      <button
-        class="action image-btn"
-        onclick="openImagePicker()"
-        title="Create or edit image"
-      >
-        🖼️
-      </button>
-
-      <input
-        id="messageInput"
-        type="text"
-        placeholder="Message Smile AI..."
-        autocomplete="off"
-      >
-
-      <button
-        class="action voice"
-        id="voiceInputBtn"
-        onclick="startVoiceInput()"
-      >
-        🎤
-      </button>
-
-      <button
-        class="action send"
-        onclick="sendMessage()"
-      >
-        ➤
-      </button>
-
-    </div>
-
-
-    <div class="footer">
-      Smile AI can make mistakes. Check important information.
-    </div>
-
-  </div>
-
-
-  <script>
-
-    /* =========================
-       BACKEND
-    ========================= */
-
-    const BACKEND_URL =
-      "https://smile-ai-1.onrender.com/chat";
-
-
-    const IMAGE_BACKEND_URL =
-      "https://smile-ai-1.onrender.com/image";
-
-
-    /* =========================
-       ELEMENTS
-    ========================= */
-
-    const chat =
-      document.getElementById("chat");
-
-    const input =
-      document.getElementById("messageInput");
-
-    const voiceInputBtn =
-      document.getElementById("voiceInputBtn");
-
-    const imagePicker =
-      document.getElementById("imagePicker");
-
-    const imagePreview =
-      document.getElementById("imagePreview");
-
-    const previewImage =
-      document.getElementById("previewImage");
-
-
-    /* =========================
-       MEMORY
-    ========================= */
-
-    let conversationHistory = [];
-
-    let userMemories = {};
-
-    let selectedImage = null;
-
-
-    try {
-
-      conversationHistory =
-        JSON.parse(
-          localStorage.getItem(
-            "smileConversation"
-          ) || "[]"
-        );
-
-    } catch {
-
-      conversationHistory = [];
-
-    }
-
-
-    try {
-
-      userMemories =
-        JSON.parse(
-          localStorage.getItem(
-            "smileMemories"
-          ) || "{}"
-        );
-
-    } catch {
-
-      userMemories = {};
-
-    }
-
-
-    /* =========================
-       LEARN MEMORY
-    ========================= */
-
-    function learnMemory(message) {
-
-      let match;
-
-
-      match =
-        message.match(
-          /\bmy name is ([^.!?]+)/i
-        );
-
-      if (match) {
-
-        userMemories.name =
-          match[1].trim();
-
-      }
-
-
-      match =
-        message.match(
-          /\bmy favorite (?:footballer|player) is ([^.!?]+)/i
-        );
-
-      if (match) {
-
-        userMemories.favoriteFootballer =
-          match[1].trim();
-
-      }
-
-
-      match =
-        message.match(
-          /\bmy favorite (?:club|team) is ([^.!?]+)/i
-        );
-
-      if (match) {
-
-        userMemories.favoriteClub =
-          match[1].trim();
-
-      }
-
-
-      match =
-        message.match(
-          /\bmy favorite game is ([^.!?]+)/i
-        );
-
-      if (match) {
-
-        userMemories.favoriteGame =
-          match[1].trim();
-
-      }
-
-
-      match =
-        message.match(
-          /\bmy favorite color is ([^.!?]+)/i
-        );
-
-      if (match) {
-
-        userMemories.favoriteColor =
-          match[1].trim();
-
-      }
-
-
-      localStorage.setItem(
-        "smileMemories",
-        JSON.stringify(
-          userMemories
-        )
-      );
-
-    }
-
-
-    /* =========================
-       SAVE CHAT
-    ========================= */
-
-    function saveConversation() {
-
-      localStorage.setItem(
-        "smileConversation",
-        JSON.stringify(
-          conversationHistory.slice(-50)
-        )
-      );
-
-    }
-
-
-    /* =========================
-       TIME
-    ========================= */
-
-    function getTime() {
-
-      return new Date()
-        .toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        });
-
-    }
-
-
-    /* =========================
-       ESCAPE HTML
-    ========================= */
-
-    function escapeHTML(text) {
-
-      const div =
-        document.createElement("div");
-
-      div.textContent =
-        text;
-
-      return div.innerHTML;
-
-    }
-
-
-    /* =========================
-       ADD MESSAGE
-    ========================= */
-
-    function addMessage(
-      role,
-      content,
-      time
-    ) {
-
-      const welcome =
-        document.getElementById(
-          "welcome"
-        );
-
-      if (welcome) {
-
-        welcome.style.display =
-          "none";
-
-      }
-
-
-      const message =
-        document.createElement("div");
-
-      message.className =
-        "message " + role;
-
-
-      const box =
-        document.createElement("div");
-
-      box.className =
-        "message-box";
-
-
-      const bubble =
-        document.createElement("div");
-
-      bubble.className =
-        "bubble";
-
-
-      bubble.innerHTML =
-        escapeHTML(content);
-
-
-      const timestamp =
-        document.createElement("div");
-
-      timestamp.className =
-        "time";
-
-      timestamp.textContent =
-        time || getTime();
-
-
-      box.appendChild(
-        bubble
-      );
-
-      box.appendChild(
-        timestamp
-      );
-
-      message.appendChild(
-        box
-      );
-
-      chat.appendChild(
-        message
-      );
-
-
-      chat.scrollTop =
-        chat.scrollHeight;
-
-    }
-
-
-    /* =========================
-       ADD IMAGE MESSAGE
-    ========================= */
-
-    function addImageMessage(
-      imageUrl,
-      caption
-    ) {
-
-      const welcome =
-        document.getElementById(
-          "welcome"
-        );
-
-      if (welcome) {
-
-        welcome.style.display =
-          "none";
-
-      }
-
-
-      const message =
-        document.createElement("div");
-
-      message.className =
-        "message assistant";
-
-
-      const box =
-        document.createElement("div");
-
-      box.className =
-        "message-box";
-
-
-      const bubble =
-        document.createElement("div");
-
-      bubble.className =
-        "bubble image-bubble";
-
-
-      const image =
-        document.createElement("img");
-
-      image.className =
-        "ai-image";
-
-      image.src =
-        imageUrl;
-
-      image.alt =
-        "Smile AI generated image";
-
-
-      bubble.appendChild(
-        image
-      );
-
-
-      if (caption) {
-
-        const captionElement =
-          document.createElement("div");
-
-        captionElement.className =
-          "image-caption";
-
-        captionElement.textContent =
-          caption;
-
-        bubble.appendChild(
-          captionElement
-        );
-
-      }
-
-
-      const timestamp =
-        document.createElement("div");
-
-      timestamp.className =
-        "time";
-
-      timestamp.textContent =
-        getTime();
-
-
-      box.appendChild(
-        bubble
-      );
-
-      box.appendChild(
-        timestamp
-      );
-
-      message.appendChild(
-        box
-      );
-
-      chat.appendChild(
-        message
-      );
-
-
-      chat.scrollTop =
-        chat.scrollHeight;
-
-    }
-
-
-    /* =========================
-       LOAD CHAT
-    ========================= */
-
-    function loadConversation() {
-
-      if (
-        conversationHistory.length === 0
-      ) {
-
-        return;
-
-      }
-
-
-      conversationHistory.forEach(
-        item => {
-
-          addMessage(
-            item.role,
-            item.content,
-            item.time
-          );
-
-        }
-      );
-
-    }
-
-
-    /* =========================
-       TYPING
-    ========================= */
-
-    function showTyping() {
-
-      removeTyping();
-
-
-      const typing =
-        document.createElement("div");
-
-      typing.id =
-        "typing";
-
-      typing.className =
-        "message assistant";
-
-
-      typing.innerHTML = `
-
-        <div class="message-box">
-
-          <div class="typing">
-
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-
+    </section>
+
+    <div class="composer-area">
+      <div class="notice hidden" id="notice"></div>
+
+      <form class="composer" id="chatForm">
+        <textarea
+          id="messageInput"
+          placeholder="Message Smile AI..."
+          rows="1"
+          maxlength="10000"
+          aria-label="Your message"
+        ></textarea>
+
+        <div class="composer-buttons">
+          <div class="tools">
+            <button type="button" class="tool-button" id="micBtn" title="Voice input">🎤</button>
+            <button type="button" class="tool-button" id="stopVoiceBtn" title="Stop voice reply">🔇</button>
           </div>
 
+          <button type="submit" class="send-button" id="sendBtn">Send ↑</button>
         </div>
-
-      `;
-
-
-      chat.appendChild(
-        typing
-      );
-
-
-      chat.scrollTop =
-        chat.scrollHeight;
-
-    }
-
-
-    function removeTyping() {
-
-      const typing =
-        document.getElementById(
-          "typing"
-        );
-
-      if (typing) {
-
-        typing.remove();
-
-      }
-
-    }
-
-
-    /* =========================
-       QUICK PROMPTS
-    ========================= */
-
-    function usePrompt(text) {
-
-      input.value =
-        text;
-
-      sendMessage();
-
-    }
-
-
-    /* =========================
-       IMAGE PICKER
-    ========================= */
-
-    function openImagePicker() {
-
-      imagePicker.click();
-
-    }
-
-
-    imagePicker.addEventListener(
-      "change",
-      function() {
-
-        const file =
-          this.files[0];
-
-        if (!file) {
-
-          return;
-
-        }
-
-
-        if (
-          !file.type.startsWith(
-            "image/"
-          )
-        ) {
-
-          alert(
-            "Please select an image."
-          );
-
-          return;
-
-        }
-
-
-        if (
-          file.size >
-          15 * 1024 * 1024
-        ) {
-
-          alert(
-            "Please choose an image smaller than 15MB."
-          );
-
-          imagePicker.value =
-            "";
-
-          return;
-
-        }
-
-
-        const reader =
-          new FileReader();
-
-
-        reader.onload =
-          function(event) {
-
-            selectedImage =
-              event.target.result;
-
-
-            previewImage.src =
-              selectedImage;
-
-
-            imagePreview.style.display =
-              "block";
-
-
-            input.placeholder =
-              "Tell Smile AI what to change...";
-
-
-            input.focus();
-
-          };
-
-
-        reader.readAsDataURL(file);
-
-      }
-    );
-
-
-    /* =========================
-       REMOVE IMAGE
-    ========================= */
-
-    function removeSelectedImage() {
-
-      selectedImage =
-        null;
-
-      imagePicker.value =
-        "";
-
-      previewImage.src =
-        "";
-
-      imagePreview.style.display =
-        "none";
-
-      input.placeholder =
-        "Message Smile AI...";
-
-    }
-
-
-    /* =========================
-       IMAGE AI
-    ========================= */
-
-    async function sendImageRequest(
-      prompt,
-      imageData
-    ) {
-
-      showTyping();
-
-
-      try {
-
-        const response =
-          await fetch(
-            IMAGE_BACKEND_URL,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-
-                  prompt:
-                    prompt,
-
-                  image:
-                    imageData || null
-
-                })
-
-            }
-          );
-
-
-        const data =
-          await response.json();
-
-
-        removeTyping();
-
-
-        if (!response.ok) {
-
-          throw new Error(
-            data.error ||
-            "Image generation failed."
-          );
-
-        }
-
-
-        if (!data.image) {
-
-          throw new Error(
-            data.message ||
-            "Smile AI did not return an image."
-          );
-
-        }
-
-
-        addImageMessage(
-          data.image,
-          data.message ||
-          "Done! 😊"
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "IMAGE ERROR:",
-          error
-        );
-
-
-        removeTyping();
-
-
-        addMessage(
-          "assistant",
-          "Sorry 😕 I couldn't create that image.\n\n" +
-          error.message
-        );
-
-      }
-
-    }
-
-
-    /* =========================
-       IMAGE COMMAND DETECTION
-    ========================= */
-
-    function isImageCommand(message) {
-
-      return /^(create|generate|make|draw|design|produce)\s+(an?\s+)?(image|picture|photo|portrait|logo|wallpaper|artwork)/i
-        .test(message);
-
-    }
-
-
-    /* =========================
-       SEND MESSAGE
-    ========================= */
-
-    async function sendMessage() {
-
-      const message =
-        input.value.trim();
-
-
-      if (!message) {
-
-        return;
-
-      }
-
-
-      /* IMAGE EDITING */
-
-      if (selectedImage) {
-
-        const image =
-          selectedImage;
-
-
-        removeSelectedImage();
-
-
-        input.value =
-          "";
-
-
-        addMessage(
-          "user",
-          "🖼️ " + message
-        );
-
-
-        await sendImageRequest(
-          message,
-          image
-        );
-
-
-        return;
-
-      }
-
-
-      /* IMAGE GENERATION */
-
-      if (
-        isImageCommand(message)
-      ) {
-
-        input.value =
-          "";
-
-
-        addMessage(
-          "user",
-          "🎨 " + message
-        );
-
-
-        await sendImageRequest(
-          message,
-          null
-        );
-
-
-        return;
-
-      }
-
-
-      /* NORMAL CHAT */
-
-      learnMemory(message);
-
-
-      const userMessage = {
-
-        role: "user",
-
-        content: message,
-
-        time: getTime()
-
-      };
-
-
-      conversationHistory.push(
-        userMessage
-      );
-
-
-      addMessage(
-        "user",
-        message,
-        userMessage.time
-      );
-
-
-      saveConversation();
-
-
-      input.value =
-        "";
-
-
-      showTyping();
-
-
-      try {
-
-        const response =
-          await fetch(
-            BACKEND_URL,
-            {
-
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-
-                  message:
-
-                    message,
-
-                  history:
-
-                    conversationHistory
-                      .slice(0, -1)
-                      .slice(-20)
-                      .map(item => ({
-
-                        role:
-                          item.role,
-
-                        content:
-                          item.content
-
-                      })),
-
-                  memories:
-                    userMemories
-
-                })
-
-            }
-          );
-
-
-        const data =
-          await response.json();
-
-
-        removeTyping();
-
-
-        if (!response.ok) {
-
-          throw new Error(
-            data.error ||
-            "Server error"
-          );
-
-        }
-
-
-        const reply =
-          data.reply ||
-          "Sorry, I couldn't think of a response.";
-
-
-        const assistantMessage = {
-
-          role: "assistant",
-
-          content: reply,
-
-          time: getTime()
-
-        };
-
-
-        conversationHistory.push(
-          assistantMessage
-        );
-
-
-        addMessage(
-          "assistant",
-          reply,
-          assistantMessage.time
-        );
-
-
-        saveConversation();
-
-
-        speak(reply);
-
-
-      } catch (error) {
-
-        console.error(
-          "Smile AI error:",
-          error
-        );
-
-
-        removeTyping();
-
-
-        addMessage(
-          "assistant",
-          "Sorry 😕 I couldn't connect to Smile AI right now."
-        );
-
-      }
-
-    }
-
-
-    /* =========================
-       ENTER TO SEND
-    ========================= */
-
-    input.addEventListener(
-      "keydown",
-      function(event) {
-
-        if (
-          event.key === "Enter"
-        ) {
-
-          event.preventDefault();
-
-          sendMessage();
-
-        }
-
-      }
-    );
-
-
-    /* =========================
-       THEME
-    ========================= */
-
-    function updateThemeButton() {
-
-      const button =
-        document.getElementById(
-          "themeBtn"
-        );
-
-
-      button.textContent =
-        document.body.classList.contains(
-          "dark"
-        )
-          ? "☀️"
-          : "🌙";
-
-    }
-
-
-    function toggleTheme() {
-
-      document.body.classList.toggle(
-        "dark"
-      );
-
-
-      localStorage.setItem(
-        "smileTheme",
-        document.body.classList.contains(
-          "dark"
-        )
-          ? "dark"
-          : "light"
-      );
-
-
-      updateThemeButton();
-
-    }
-
-
-    if (
-      localStorage.getItem(
-        "smileTheme"
-      ) === "dark"
-    ) {
-
-      document.body.classList.add(
-        "dark"
-      );
-
-    }
-
-
-    updateThemeButton();
-
-
-    /* =========================
-       VOICE REPLIES
-    ========================= */
-
-    let voiceReplies =
-      localStorage.getItem(
-        "smileVoiceReplies"
-      ) !== "false";
-
-
-    function updateVoiceButton() {
-
-      document.getElementById(
-        "voiceReplyBtn"
-      ).textContent =
-        voiceReplies
-          ? "🔊"
-          : "🔇";
-
-    }
-
-
-    function toggleVoiceReplies() {
-
-      voiceReplies =
-        !voiceReplies;
-
-
-      localStorage.setItem(
-        "smileVoiceReplies",
-        voiceReplies
-      );
-
-
-      updateVoiceButton();
-
-
-      if (
-        !voiceReplies &&
-        "speechSynthesis" in window
-      ) {
-
-        speechSynthesis.cancel();
-
-      }
-
-    }
-
-
-    function speak(text) {
-
-      if (!voiceReplies) {
-
-        return;
-
-      }
-
-
-      if (
-        !("speechSynthesis" in window)
-      ) {
-
-        return;
-
-      }
-
-
-      speechSynthesis.cancel();
-
-
-      const speech =
-        new SpeechSynthesisUtterance(
-          text
-        );
-
-
-      speech.lang =
-        "en-NG";
-
-      speech.rate =
-        1;
-
-      speech.pitch =
-        1;
-
-
-      speechSynthesis.speak(
-        speech
-      );
-
-    }
-
-
-    updateVoiceButton();
-
-
-    /* =========================
-       VOICE INPUT
-    ========================= */
-
-    function startVoiceInput() {
-
-      const Recognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
-
-
-      if (!Recognition) {
-
-        alert(
-          "Voice input is not supported by this browser."
-        );
-
-        return;
-
-      }
-
-
-      const recognition =
-        new Recognition();
-
-
-      recognition.lang =
-        "en-NG";
-
-      recognition.interimResults =
-        false;
-
-      recognition.maxAlternatives =
-        1;
-
-
-      voiceInputBtn.classList.add(
-        "listening"
-      );
-
-
-      try {
-
-        recognition.start();
-
-      } catch (error) {
-
-        console.log(
-          error
-        );
-
-      }
-
-
-      recognition.onresult =
-        function(event) {
-
-          input.value =
-            event.results[0][0]
-              .transcript;
-
-          sendMessage();
-
-        };
-
-
-      recognition.onerror =
-        function(error) {
-
-          console.log(
-            "Voice error:",
-            error
-          );
-
-        };
-
-
-      recognition.onend =
-        function() {
-
-          voiceInputBtn.classList.remove(
-            "listening"
-          );
-
-        };
-
-    }
-
-
-    /* =========================
-       CLEAR CHAT
-    ========================= */
-
-    function clearChat() {
-
-      if (
-        !confirm(
-          "Clear your conversation and saved memories?"
-        )
-      ) {
-
-        return;
-
-      }
-
-
-      conversationHistory =
-        [];
-
-      userMemories =
-        {};
-
-
-      localStorage.removeItem(
-        "smileConversation"
-      );
-
-      localStorage.removeItem(
-        "smileMemories"
-      );
-
-
-      if (
-        "speechSynthesis" in window
-      ) {
-
-        speechSynthesis.cancel();
-
-      }
-
-
-      location.reload();
-
-    }
-
-
-    /* =========================
-       START
-    ========================= */
-
-    loadConversation();
-
-    input.focus();
-
-  </script>
-
+      </form>
+
+      <div class="footer-note">
+        Smile AI can make mistakes. Check important information.
+      </div>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
 </body>
-</html>
+  </html>
