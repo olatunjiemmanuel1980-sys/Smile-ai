@@ -1,118 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#090b10">
-
   <title>Smile AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo">😊</div>
+      <div>
+        <h1>Smile AI</h1>
+        <p><span class="online-dot"></span> Your AI friend is online</p>
+      </div>
+    </header><main id="chat">
+  <div class="message ai">
+    <div class="bubble">
+      Heyyy! 🥰 I'm Smile AI, your AI friend. What are we talking about today?
+    </div>
+    <span class="time">Now</span>
+  </div>
+</main>
 
-  <style>
-    :root {
-      --bg: #090b10;
-      --panel: #11141c;
-      --panel2: #191d28;
-      --text: #f4f5f8;
-      --muted: #9299aa;
-      --accent: #8b7cff;
-      --border: #282d3a;
-    }
+<div class="suggestions">
+  <button onclick="quickSend('Tell me a joke 😂')">😂 Tell me a joke</button>
+  <button onclick="quickSend('Let us talk 🥰')">💬 Let's talk</button>
+</div>
 
-    * {
-      box-sizing: border-box;
-    }
+<form id="chat-form">
+  <input id="user-input" type="text" placeholder="Message Smile AI..." autocomplete="off" required>
+  <button id="send-btn" type="submit">➤</button>
+</form>
 
-    body {
-      margin: 0;
-      height: 100dvh;
-      display: flex;
-      overflow: hidden;
-      background: var(--bg);
-      color: var(--text);
-      font-family: Arial, sans-serif;
-    }
+<footer>Made with ❤️ by Smile</footer>
 
-    button, textarea {
-      font: inherit;
-    }
-
-    button {
-      cursor: pointer;
-    }
-
-    .sidebar {
-      width: 250px;
-      padding: 18px;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .brand {
-      font-size: 26px;
-      font-weight: bold;
-      margin: 10px 0 18px;
-    }
-
-    .brand span {
-      color: var(--accent);
-    }
-
-    .side-button {
-      width: 100%;
-      padding: 13px;
-      text-align: left;
-      color: var(--text);
-      background: var(--panel2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-    }
-
-    .side-button:hover {
-      border-color: var(--accent);
-    }
-
-    .history-title {
-      margin-top: 15px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .history-list {
-      overflow-y: auto;
-    }
-
-    .history-item {
-      padding: 10px;
-      border-radius: 8px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      cursor: pointer;
-      font-size: 13px;
-    }
-
-    .history-item:hover {
-      background: var(--panel2);
-    }
-
-    .sidebar-bottom {
-      margin-top: auto;
-      display: grid;
-      gap: 9px;
-    }
-
-    .main {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .topbar {
-      height: 64px;
-      padding: 0 18px;
-      border-bottom: 1px solid var(--border);
-      display: flex
+  </div>  <script src="script.js"></script></body>
+</html>
