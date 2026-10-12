@@ -9,7 +9,7 @@ app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = "gemini-3.8-flash";
+model: "gemini-3.5-flash-lite",
 
 const ai = API_KEY
 ? new GoogleGenAI({ apiKey: API_KEY })
