@@ -7,52 +7,56 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 10000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const API_KEY = process.env.GEMINI_API_KEY;
 
-// Gemini model with Google Search grounding
-const MODEL = "gemini-3.8-flash";
+// Both models have remaining quota according to your dashboard.
+const MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite"
+];
 
 const SYSTEM_PROMPT = `
-You are Smile AI, a friendly, intelligent, funny and helpful AI assistant.
+You are Smile AI, the user's friendly AI companion.
 
-YOUR PERSONALITY:
-- Be friendly, natural, and conversational.
-- You may use emojis when appropriate.
-- Understand Nigerian English and Nigerian Pidgin.
-- Match the user's tone.
-- Explain difficult things simply.
-- Be honest when you do not know something.
+PERSONALITY:
+- Be friendly, funny, intelligent, and helpful.
+- Understand Nigerian English and Pidgin.
+- Use emojis naturally.
+- Answer questions directly.
+- Explain difficult things in simple language.
 
-CURRENT INFORMATION:
-- Use the current date and time supplied with each request.
-- The current year is determined by that date, not your training data.
-- Never assume that your training data represents today's information.
-- Search the internet when current information would improve your answer.
-- Search when asked about recent events, football, scores, transfers,
-  celebrities, technology, games, prices, weather, or breaking news.
-- Search for other topics too whenever useful.
-- Do not invent search results, scores, news, dates, or facts.
-- Clearly say when information cannot be verified.
-- Distinguish old information from current information.
+CURRENT DATE:
+Use the current date and time provided in each request.
+The date is generated automatically using the Africa/Lagos timezone.
+Never claim that the current year is 2025 when the supplied date says otherwise.
 
-CONVERSATION:
-- Pay attention to the conversation history provided by the server.
-- Remember facts stated earlier in the available conversation.
+LIVE INTERNET SEARCH:
+- Use Google Search whenever current information would help.
+- Search for current football results, transfers, news, technology,
+  gaming, celebrities, prices, and other recent developments.
+- Search when the user explicitly asks you to check something.
+- Never invent search results or pretend you searched when you did not.
+- If a search fails, honestly explain that current information
+  could not be verified.
+
+MEMORY:
+- Use the personal memories and conversation history provided.
+- Remember that the user's favourite footballer is Mohamed Salah.
+- Remember that the user's favourite football club is Liverpool.
 - Do not claim to remember information that is not available.
-- Answer the user's actual question directly.
 
 FOOTBALL:
-- Treat football questions seriously.
-- Use current information for recent matches, standings, transfers,
-  injuries, and team news when available.
-- Never invent live scores.
+- Give accurate information about teams, players, competitions,
+  tactics, results, transfers, and football history.
+- Check current information when asked about recent events.
+- Never invent fixtures or live scores.
 
-PRIVACY AND SECURITY:
+IMPORTANT:
 - Never reveal API keys or server secrets.
-- Do not claim you performed an action that you did not perform.
+- Never claim that you completed an internet search if you did not.
 `;
 
-function getNigeriaDateTime() {
+function getCurrentDate() {
     return new Intl.DateTimeFormat("en-NG", {
         dateStyle: "full",
         timeStyle: "short",
@@ -65,38 +69,32 @@ function formatHistory(history) {
         return "";
     }
 
-    return history
-        .slice(-15)
-        .map((item) => {
-            const role =
-                item.role === "assistant" ||
-                item.role === "model" ||
-                item.sender === "assistant"
-                    ? "Smile AI"
-                    : "User";
+    return history.slice(-15).map((item) => {
+        const role =
+            item.role === "assistant" ||
+            item.role === "model" ||
+            item.sender === "assistant"
+                ? "Smile AI"
+                : "User";
 
-            const content =
-                item.content ??
-                item.text ??
-                item.message ??
-                item.parts?.[0]?.text ??
-                "";
+        const content =
+            item.content ??
+            item.text ??
+            item.message ??
+            "";
 
-            if (typeof content !== "string" || !content.trim()) {
-                return "";
-            }
+        if (typeof content !== "string" || !content.trim()) {
+            return "";
+        }
 
-            return `${role}: ${content.trim()}`;
-        })
-        .filter(Boolean)
-        .join("\n");
+        return `${role}: ${content.trim()}`;
+    }).filter(Boolean).join("\n");
 }
 
 app.get("/", (req, res) => {
     res.json({
         name: "Smile AI",
-        status: "online",
-        message: "Your AI friend is online."
+        status: "online"
     });
 });
 
@@ -104,167 +102,165 @@ app.get("/health", (req, res) => {
     res.json({
         status: "ok",
         service: "Smile AI",
-        model: MODEL,
-        configured: Boolean(GEMINI_API_KEY),
+        models: MODELS,
+        configured: Boolean(API_KEY),
         liveSearch: true
     });
 });
 
-app.post("/chat", async (req, res) => {
+async function askGemini(model, input) {
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+        controller.abort();
+    }, 45000);
+
     try {
-        if (!GEMINI_API_KEY) {
-            return res.status(500).json({
-                reply:
-                    "My brain isn't connected yet 😭. " +
-                    "Please check the GEMINI_API_KEY setting on the server."
-            });
-        }
-
-        const message = req.body?.message;
-        const history = req.body?.history;
-
-        if (typeof message !== "string" || !message.trim()) {
-            return res.status(400).json({
-                reply: "Oya, send me a message first 😅❤️"
-            });
-        }
-
-        const dateTime = getNigeriaDateTime();
-        const conversationHistory = formatHistory(history);
-
-        const input = `
-CURRENT DATE AND TIME IN NIGERIA:
-${dateTime}
-
-PREVIOUS CONVERSATION:
-${conversationHistory || "No previous conversation supplied."}
-
-NEW USER MESSAGE:
-${message.trim()}
-
-Respond naturally to the new user message.
-Use Google Search when current information would help.
-`;
-
-        const controller = new AbortController();
-
-        const timeout = setTimeout(() => {
-            controller.abort();
-        }, 55000);
-
-        let response;
-
-        try {
-            response = await fetch(
-                "https://generativelanguage.googleapis.com/v1beta/interactions",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-goog-api-key": GEMINI_API_KEY
-                    },
-                    body: JSON.stringify({
-                        model: MODEL,
-                        input,
-                        system_instruction: SYSTEM_PROMPT,
-                        tools: [
-                            {
-                                type: "google_search"
-                            }
-                        ],
-                        store: false
-                    }),
-                    signal: controller.signal
-                }
-            );
-        } finally {
-            clearTimeout(timeout);
-        }
+        const response = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": API_KEY
+                },
+                body: JSON.stringify({
+                    model: model,
+                    input: input,
+                    system_instruction: SYSTEM_PROMPT,
+                    tools: [
+                        {
+                            type: "google_search"
+                        }
+                    ],
+                    store: false
+                }),
+                signal: controller.signal
+            }
+        );
 
         const data = await response.json();
 
-        if (!response.ok) {
-            console.error(
-                "Gemini API error:",
-                response.status,
-                JSON.stringify(data)
-            );
+        return {
+            ok: response.ok,
+            status: response.status,
+            data: data
+        };
 
-            if (response.status === 400) {
-                return res.status(502).json({
-                    reply:
-                        "My live-search brain hit an API configuration " +
-                        "problem 😭. Check the Render logs for the exact error."
-                });
-            }
+    } finally {
+        clearTimeout(timeout);
+    }
+}
 
-            if (response.status === 401 || response.status === 403) {
-                return res.status(502).json({
-                    reply:
-                        "I can't access my AI brain right now 🔑. " +
-                        "The API key or search permissions may need fixing."
-                });
-            }
-
-            if (response.status === 429) {
-                return res.status(503).json({
-                    reply:
-                        "Too many requests or my free API limit has been " +
-                        "reached 😭. Please try again later."
-                });
-            }
-
-            return res.status(502).json({
-                reply:
-                    "My AI service is having a problem right now 😕. " +
-                    "Please try again shortly."
-            });
-        }
-
-        const reply =
-            data.output_text ||
-            data.outputText ||
-            "";
-
-        if (!reply.trim()) {
-            console.error(
-                "Gemini returned no output text:",
-                JSON.stringify(data)
-            );
-
-            return res.status(502).json({
-                reply:
-                    "I received an empty response from my AI brain 😭. " +
-                    "Please send your message again."
-            });
-        }
-
-        return res.json({
-            reply: reply.trim(),
-            model: MODEL
-        });
-
-    } catch (error) {
-        console.error("Chat error:", error);
-
-        if (error.name === "AbortError") {
-            return res.status(504).json({
-                reply:
-                    "That request took too long 😭. " +
-                    "Please try asking again."
-            });
-        }
-
+app.post("/chat", async (req, res) => {
+    if (!API_KEY) {
         return res.status(500).json({
-            reply:
-                "Something went wrong while I was thinking 😕. " +
-                "Please try again."
+            reply: "My AI brain is missing its API key. Please check the server settings."
         });
     }
+
+    const message = req.body?.message;
+
+    if (typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({
+            reply: "Oya, send me a message first! 😂"
+        });
+    }
+
+    const history = formatHistory(req.body?.history);
+
+    const input = `
+CURRENT DATE AND TIME IN NIGERIA:
+${getCurrentDate()}
+
+IMPORTANT PERSONAL MEMORIES:
+- Favourite footballer: Mohamed Salah.
+- Favourite football club: Liverpool.
+
+RECENT CONVERSATION:
+${history || "No previous conversation provided."}
+
+NEW MESSAGE:
+${message.trim()}
+
+Answer the new message using the relevant context.
+Use Google Search for current information when needed.
+`;
+
+    for (const model of MODELS) {
+        try {
+            console.log(`Trying model: ${model}`);
+
+            const result = await askGemini(model, input);
+
+            if (result.ok) {
+                const data = result.data;
+
+                const reply =
+                    data.output_text ||
+                    data.outputText ||
+                    "";
+
+                if (reply.trim()) {
+                    console.log(`Success using ${model}`);
+
+                    return res.json({
+                        reply: reply.trim(),
+                        model: model
+                    });
+                }
+
+                console.error(
+                    "Empty response:",
+                    JSON.stringify(data)
+                );
+
+                continue;
+            }
+
+            console.error(
+                `Gemini error from ${model}:`,
+                result.status,
+                JSON.stringify(result.data)
+            );
+
+            // Try the next model when quota is exhausted
+            // or the current model is temporarily unavailable.
+            if (
+                result.status === 429 ||
+                result.status === 503
+            ) {
+                continue;
+            }
+
+            return res.status(502).json({
+                reply:
+                    "My AI service returned an error. " +
+                    "Please check the server logs."
+            });
+
+        } catch (error) {
+            console.error(
+                `Request failed for ${model}:`,
+                error.message
+            );
+
+            if (error.name === "AbortError") {
+                continue;
+            }
+        }
+    }
+
+    return res.status(503).json({
+        reply:
+            "Both AI models are temporarily unavailable or have " +
+            "reached their limits. Please try again later."
+    });
 });
 
 app.listen(PORT, () => {
-    console.log(`Smile AI is running on port ${PORT}`);
-    console.log(`Model: ${MODEL}`);
-    console.log(`Google Search grounding enabled`);
+    console.log(`Smile AI running on port ${PORT}`);
+    console.log("Primary model:", MODELS[0]);
+    console.log("Fallback model:", MODELS[1]);
+    console.log("Google Search enabled in requests");
 });
