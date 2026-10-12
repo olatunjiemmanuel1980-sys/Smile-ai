@@ -1,6 +1,6 @@
-// ======================================
-// SMILE AI — COMPLETE CHAT JAVASCRIPT
-// ======================================
+// ==========================================
+// SMILE AI — FIXED CHAT SYSTEM
+// ==========================================
 
 const BACKEND_URL = "https://smile-ai-1.onrender.com/chat";
 
@@ -13,39 +13,45 @@ const statusText = document.getElementById("status");
 let conversation = [];
 let isSending = false;
 
-// ======================================
-// LOAD SAVED CONVERSATION
-// ======================================
+// ==========================================
+// LOAD SAVED CHAT
+// ==========================================
 
 try {
     const saved = localStorage.getItem("smileConversation");
 
     if (saved) {
-        conversation = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
 
-        if (!Array.isArray(conversation)) {
-            conversation = [];
+        if (Array.isArray(parsed)) {
+            conversation = parsed.filter(item =>
+                item &&
+                typeof item.content === "string" &&
+                ["user", "assistant", "model"].includes(item.role)
+            ).slice(-50);
         }
     }
 } catch (error) {
-    conversation = [];
+    console.error("Could not load chat:", error);
 }
 
-// ======================================
-// CREATE A MESSAGE
-// ======================================
+// ==========================================
+// DISPLAY MESSAGE
+// ==========================================
 
 function addMessage(text, sender) {
     const message = document.createElement("div");
 
-    message.classList.add("message");
-    message.classList.add(sender === "user" ? "user" : "bot");
+    message.className =
+        "message " + (sender === "user" ? "user" : "bot");
 
-    // Safely display text without interpreting it as HTML.
-    message.appendChild(document.createTextNode(String(text)));
+    message.appendChild(
+        document.createTextNode(String(text))
+    );
 
     const time = document.createElement("span");
     time.className = "time";
+
     time.textContent = new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
@@ -59,9 +65,9 @@ function addMessage(text, sender) {
     return message;
 }
 
-// ======================================
-// SAVE CONVERSATION
-// ======================================
+// ==========================================
+// SAVE CHAT
+// ==========================================
 
 function saveConversation() {
     try {
@@ -70,46 +76,40 @@ function saveConversation() {
             JSON.stringify(conversation.slice(-50))
         );
     } catch (error) {
-        console.log("Could not save conversation:", error);
+        console.error("Could not save chat:", error);
     }
 }
 
-// ======================================
-// RESTORE MESSAGES
-// ======================================
+// ==========================================
+// RESTORE CHAT
+// ==========================================
 
 function restoreConversation() {
-    if (conversation.length === 0) {
-        return;
-    }
+    if (!conversation.length) return;
 
-    // Remove the welcome message when restoring an old chat.
     chat.innerHTML = "";
 
-    conversation.forEach(function (item) {
-        if (!item || typeof item.content !== "string") {
-            return;
-        }
+    conversation.forEach(item => {
+        const sender =
+            item.role === "user" ? "user" : "bot";
 
-        if (item.role === "user") {
-            addMessage(item.content, "user");
-        } else if (item.role === "assistant" || item.role === "model") {
-            addMessage(item.content, "bot");
-        }
+        addMessage(item.content, sender);
     });
 }
 
 restoreConversation();
 
-// ======================================
+// ==========================================
 // TYPING INDICATOR
-// ======================================
+// ==========================================
 
 function showTyping() {
+    hideTyping();
+
     const typing = document.createElement("div");
 
-    typing.className = "message bot";
     typing.id = "smileTyping";
+    typing.className = "message bot";
     typing.textContent = "Smile AI is thinking... 💭";
 
     chat.appendChild(typing);
@@ -124,20 +124,27 @@ function hideTyping() {
     }
 }
 
-// ======================================
-// SEND MESSAGE
-// ======================================
+// ==========================================
+// SEND MESSAGE — WITH TIMEOUT
+// ==========================================
 
 async function sendMessage(text) {
     text = String(text || "").trim();
 
-    if (!text || isSending) {
-        return;
-    }
+    if (!text || isSending) return;
 
     isSending = true;
+
     sendButton.disabled = true;
     input.disabled = true;
+
+    // Save the previous conversation before adding this message.
+    const previousHistory = conversation
+        .slice(-20)
+        .map(item => ({
+            role: item.role === "assistant" ? "model" : item.role,
+            content: item.content
+        }));
 
     // Display the user's message immediately.
     addMessage(text, "user");
@@ -154,32 +161,38 @@ async function sendMessage(text) {
     statusText.textContent = "Connecting to Smile AI...";
     showTyping();
 
+    // Stop waiting if the backend takes too long.
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+        controller.abort();
+    }, 45000);
+
     try {
         const response = await fetch(BACKEND_URL, {
             method: "POST",
+
             headers: {
                 "Content-Type": "application/json"
             },
+
             body: JSON.stringify({
                 message: text,
-                history: conversation.slice(-20).map(function (item) {
-                    return {
-                        role: item.role === "assistant" ? "model" : item.role,
-                        content: item.content
-                    };
-                })
-            })
+                history: previousHistory
+            }),
+
+            signal: controller.signal
         });
 
-        const rawResponse = await response.text();
+        const responseText = await response.text();
 
         let data;
 
         try {
-            data = JSON.parse(rawResponse);
-        } catch (error) {
+            data = JSON.parse(responseText);
+        } catch {
             throw new Error(
-                "Smile AI returned an unexpected response. Please try again."
+                "The server returned an invalid response."
             );
         }
 
@@ -187,7 +200,7 @@ async function sendMessage(text) {
             throw new Error(
                 data.error ||
                 data.message ||
-                "Server error: " + response.status
+                "Server error (" + response.status + ")."
             );
         }
 
@@ -199,13 +212,12 @@ async function sendMessage(text) {
 
         if (typeof reply !== "string" || !reply.trim()) {
             throw new Error(
-                "The server connected, but Smile AI returned no message."
+                "The server connected, but returned no answer."
             );
         }
 
         hideTyping();
 
-        // Display Smile AI's reply.
         addMessage(reply, "bot");
 
         conversation.push({
@@ -214,60 +226,66 @@ async function sendMessage(text) {
         });
 
         conversation = conversation.slice(-50);
+
         saveConversation();
 
         statusText.textContent = "Smile AI is online ✨";
 
     } catch (error) {
+        console.error("Smile AI request failed:", error);
+
         hideTyping();
 
-        console.error("Smile AI error:", error);
+        let errorMessage;
 
-        addMessage(
-            "Sorry 😭 I couldn't reply right now.\n\n" +
-            error.message +
-            "\n\nPlease try sending your message again.",
-            "bot"
-        );
+        if (error.name === "AbortError") {
+            errorMessage =
+                "Smile AI took too long to respond. 😕\n\n" +
+                "The AI server may be busy. Please try again.";
+        } else {
+            errorMessage =
+                "I couldn't get a reply right now. 😕\n\n" +
+                error.message +
+                "\n\nPlease try again.";
+        }
+
+        addMessage(errorMessage, "bot");
 
         statusText.textContent = "Connection problem — try again";
 
     } finally {
+        clearTimeout(timeout);
+
+        hideTyping();
+
         isSending = false;
+
         sendButton.disabled = false;
         input.disabled = false;
+
         input.focus();
+
         chat.scrollTop = chat.scrollHeight;
     }
 }
 
-// ======================================
+// ==========================================
 // FORM SUBMISSION
-// ======================================
+// ==========================================
 
-form.addEventListener("submit", function (event) {
+form.addEventListener("submit", function(event) {
     event.preventDefault();
-
-    const text = input.value.trim();
-
-    sendMessage(text);
+    sendMessage(input.value);
 });
 
-// ======================================
+// ==========================================
 // SUGGESTION BUTTONS
-// ======================================
+// ==========================================
 
 function askSuggestion(text) {
     sendMessage(text);
 }
 
-// Make this function accessible to HTML onclick.
 window.askSuggestion = askSuggestion;
 
-// ======================================
-// INITIAL STATUS
-// ======================================
-
-statusText.textContent = "Ready to chat ✨";
-
-console.log("Smile AI JavaScript loaded successfully!");
+console.log("Smile AI chat system loaded successfully!");
