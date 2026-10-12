@@ -11,92 +11,53 @@ const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
-const ai = API_KEY
-    ? new GoogleGenAI({ apiKey: API_KEY })
-    : null;
-
-// ==========================================
-// SMILE AI'S BRAIN
-// ==========================================
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
 const SYSTEM_PROMPT = `
-You are Smile AI, a general-purpose AI assistant created by Smile.
+You are Smile AI, a friendly, intelligent, general-purpose AI assistant.
 
-YOUR PERSONALITY:
-- Friendly, intelligent, funny, natural and respectful.
-- Speak casually when appropriate.
-- Understand Nigerian English and Nigerian Pidgin.
-- Use emojis naturally without overdoing them.
-- Be patient and explain difficult things simply.
-- Adapt your response to the user's age and understanding.
+PERSONALITY:
+- Be friendly, helpful, natural and occasionally funny.
+- Understand Nigerian English and Pidgin.
+- Use emojis naturally.
+- Explain difficult topics in simple steps.
+- Answer the user's actual question.
 
-YOUR ABILITIES:
-- Answer questions about science, mathematics, English,
-  technology, coding, history, geography and other subjects.
-- Help with homework and presentations.
-- Write, explain, debug and improve code.
-- Discuss football, games, music, entertainment and everyday life.
-- Help with brainstorming, planning and creative writing.
-- Explain problems step by step when necessary.
-- Format mathematics clearly using standard mathematical notation
-  or LaTeX when appropriate.
-- Give useful, honest answers instead of unnecessary introductions.
+ABILITIES:
+- Mathematics, science, English and school assignments.
+- Coding, technology and programming.
+- Football, gaming, entertainment and everyday life.
+- Writing, brainstorming and presentations.
+- Detailed explanations and problem-solving.
 
 IDENTITY:
 - Your name is Smile AI.
 - Your creator is Smile.
-- You are a general-purpose assistant, not an AI focused on only
-  football, mathematics or any other single topic.
-
-KNOWN PREFERENCES:
 - The user's favourite footballer is Mohamed Salah.
-- The user's favourite football club is Liverpool.
-- Use these details naturally when relevant.
-- Do not force them into unrelated conversations.
+- The user's favourite club is Liverpool.
+- Mention these preferences only when relevant.
 
 ACCURACY:
-- Never make up facts, sources, statistics or events.
-- If you are unsure, say so honestly.
-- For current information, distinguish verified facts from
-  information you cannot verify.
-- Do not claim you searched the internet unless a search actually
-  took place.
-- For mathematics, check calculations before answering.
-- For schoolwork, explain the method, not just the final answer.
-
-DATE AND TIME:
-- The current Nigeria date and time will be provided with each
-  message. Use it when relevant.
-- The timezone is Africa/Lagos.
-
-MEMORY:
-- Use the conversation history provided with each request.
-- Do not claim to remember conversations that were not provided.
-- If a user corrects you, acknowledge the correction and adapt.
+- Never invent facts or pretend to have searched the internet.
+- Be honest when you are unsure.
+- Check mathematical calculations.
+- Explain working when helping with schoolwork.
+- Use the current Nigeria date and time provided in the message.
 
 CONVERSATION:
-- Answer the latest message directly.
-- Ask a short follow-up question only when necessary.
-- Keep simple answers concise and detailed answers well organised.
-- If the user asks for a complete code file, provide a complete file
-  rather than disconnected snippets.
+- Use the conversation history provided.
+- Answer the newest message directly.
+- Format answers clearly.
+- Do not claim to remember information that was not provided.
 `;
 
-// ==========================================
-// NIGERIA DATE AND TIME
-// ==========================================
-
-function getNigeriaDateTime() {
+function nigeriaDateTime() {
     return new Intl.DateTimeFormat("en-NG", {
         dateStyle: "full",
         timeStyle: "short",
         timeZone: "Africa/Lagos"
     }).format(new Date());
 }
-
-// ==========================================
-// HEALTH CHECK
-// ==========================================
 
 app.get("/", (req, res) => {
     res.json({
@@ -115,14 +76,10 @@ app.get("/health", (req, res) => {
     });
 });
 
-// ==========================================
-// CHAT ENDPOINT
-// ==========================================
-
 app.post("/chat", async (req, res) => {
     if (!ai) {
         return res.status(500).json({
-            error: "GEMINI_API_KEY is missing in Render environment variables."
+            error: "Missing GEMINI_API_KEY in Render environment variables."
         });
     }
 
@@ -135,7 +92,6 @@ app.post("/chat", async (req, res) => {
     }
 
     try {
-        // Accept recent conversation history from the website.
         let history = Array.isArray(req.body.history)
             ? req.body.history
             : [];
@@ -148,12 +104,109 @@ app.post("/chat", async (req, res) => {
             )
             .slice(-20)
             .map(item => ({
-                role: item.role === "assistant"
-                    ? "model"
-                    : item.role,
+                role: item.role === "assistant" ? "model" : item.role,
                 parts: [{
                     text: item.content.slice(0, 8000)
                 }]
             }));
 
-        //
+        const last = history[history.length - 1];
+
+        if (
+            last &&
+            last.role === "user" &&
+            last.parts[0].text.trim() === message.trim()
+        ) {
+            history.pop();
+        }
+
+        const contents = [
+            ...history,
+            {
+                role: "user",
+                parts: [{
+                    text:
+                        "Current Nigeria date and time: " +
+                        nigeriaDateTime() +
+                        "\n\nUser message:\n" +
+                        message.trim()
+                }]
+            }
+        ];
+
+        const result = await ai.models.generateContent({
+            model: MODEL,
+            contents,
+            config: {
+                systemInstruction: SYSTEM_PROMPT,
+                temperature: 0.7,
+                maxOutputTokens: 4096
+            }
+        });
+
+        const reply = result.text;
+
+        if (typeof reply !== "string" || !reply.trim()) {
+            return res.status(502).json({
+                error: "Smile AI received an empty response. Please try again."
+            });
+        }
+
+        return res.json({
+            reply: reply.trim(),
+            model: MODEL,
+            status: "success"
+        });
+
+    } catch (error) {
+        console.error("Smile AI error:", error);
+
+        const messageText = String(error.message || "").toLowerCase();
+        const status = Number(
+            error.status || error.statusCode || error.error?.code
+        ) || 500;
+
+        if (
+            status === 429 ||
+            messageText.includes("quota") ||
+            messageText.includes("rate limit")
+        ) {
+            return res.status(429).json({
+                error: "Gemini's API quota or rate limit has been reached. Please try again later."
+            });
+        }
+
+        if (status === 401 || status === 403) {
+            return res.status(502).json({
+                error: "Gemini rejected the API key or access. Check GEMINI_API_KEY in Render."
+            });
+        }
+
+        if (status === 404) {
+            return res.status(502).json({
+                error: "The Gemini model was not found. Check the GEMINI_MODEL setting."
+            });
+        }
+
+        if ([502, 503, 504].includes(status)) {
+            return res.status(503).json({
+                error: "Gemini is temporarily unavailable. Please try again shortly."
+            });
+        }
+
+        return res.status(500).json({
+            error: "Smile AI encountered a server error. Check the Render logs."
+        });
+    }
+});
+
+app.use((req, res) => {
+    res.status(404).json({
+        error: "Route not found."
+    });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+    console.log("Smile AI running on port " + PORT);
+    console.log("Model: " + MODEL);
+    console.log("API key configured: "
