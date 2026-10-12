@@ -209,4 +209,5 @@ app.use((req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
     console.log("Smile AI running on port " + PORT);
     console.log("Model: " + MODEL);
-    console.log("API key configured: "
+    console.log("API key configured: " + Boolean(API_KEY));
+});
