@@ -9,177 +9,224 @@ app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.GEMINI_API_KEY;
-
-// Use the model recommended by your Gemini error.
 const MODEL = "gemini-3.8-flash";
 
-let ai = null;
-
-if (API_KEY) {
-  ai = new GoogleGenAI({
-    apiKey: API_KEY
-  });
-}
-
-const memories = {};
+const ai = API_KEY
+? new GoogleGenAI({ apiKey: API_KEY })
+: null;
 
 const SYSTEM_PROMPT = `
 You are Smile AI, a friendly, intelligent, funny and helpful AI assistant.
 
 PERSONALITY:
-- Be friendly, natural, warm and conversational.
-- Talk like a real person, not a robot.
-- Use emojis naturally, but do not overuse them.
-- Understand Nigerian English and Nigerian Pidgin.
-- Give clear explanations when helping with schoolwork.
-- Be honest when you do not know something.
-- Never pretend you performed an action you did not perform.
 
-MEMORY:
-- Remember important information the user tells you during the conversation.
-- Use the conversation history to maintain context.
-- Remember the user's preferences when they appear in the provided history.
-- Never claim to have permanent memory unless the server actually saves it.
+- Be warm, natural, friendly and conversational.
+- Use emojis naturally.
+- Understand Nigerian English and Nigerian Pidgin.
+- Explain schoolwork clearly when asked.
+- Give useful, direct answers.
+- Be honest if you do not know something.
+- Never pretend to perform actions you cannot perform.
 
 IDENTITY:
+
 - Your name is Smile AI.
 - Your creator is Smile.
-- You are here to help, chat, explain, brainstorm and solve problems.
+- You are an AI assistant that helps people learn, chat, brainstorm and solve problems.
 
-Answer the user's latest message directly.
-`;
+CONVERSATION:
 
-// Home route
-app.get("/", (req, res) => {
-  res.json({
-    name: "Smile AI",
-    status: "online",
-    model: MODEL
-  });
-});
+- Pay attention to the conversation history provided.
+- Remember the context of the current conversation.
+- Answer the user's latest message directly.
+  `;
 
-// Health check
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "Smile AI",
+const sleep = ms =>
+new Promise(resolve => setTimeout(resolve, ms));
+
+function getStatus(error) {
+return Number(
+error.status ||
+error.code ||
+error.error?.code
+) || 500;
+}
+
+function isTemporaryError(error) {
+const status = getStatus(error);
+
+return [408, 429, 500, 502, 503, 504].includes(status);
+}
+
+async function generateWithRetry(contents) {
+let lastError;
+
+// Three attempts, with a delay between attempts.
+for (let attempt = 1; attempt <= 3; attempt++) {
+try {
+console.log(
+"Gemini request: attempt ${attempt}/3 using ${MODEL}"
+);
+
+  return await ai.models.generateContent({
     model: MODEL,
-    configured: Boolean(API_KEY)
+    contents,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      temperature: 0.8,
+      maxOutputTokens: 2048
+    }
   });
-});
 
-// Chat route
-app.post("/chat", async (req, res) => {
-  try {
-    if (!ai) {
-      return res.status(500).json({
-        error: "GEMINI_API_KEY is missing in Render environment variables."
-      });
-    }
+} catch (error) {
+  lastError = error;
 
-    const message = req.body.message;
+  console.error(
+    `Gemini attempt ${attempt} failed:`,
+    error.message
+  );
 
-    if (typeof message !== "string" || !message.trim()) {
-      return res.status(400).json({
-        error: "Please enter a message."
-      });
-    }
-
-    const userId = String(req.body.userId || "default");
-
-    // Keep a short conversation history in server memory.
-    if (!memories[userId]) {
-      memories[userId] = [];
-    }
-
-    let history = Array.isArray(req.body.history)
-      ? req.body.history
-      : [];
-
-    // Keep only valid recent messages.
-    history = history
-      .filter(item =>
-        item &&
-        typeof item.content === "string" &&
-        ["user", "assistant", "model"].includes(item.role)
-      )
-      .slice(-20)
-      .map(item => ({
-        role: item.role === "assistant" ? "model" : item.role,
-        parts: [{ text: item.content.slice(0, 8000) }]
-      }));
-
-    // Avoid sending the latest message twice if the frontend
-    // already included it in the history.
-    if (
-      history.length > 0 &&
-      history[history.length - 1].role === "user" &&
-      history[history.length - 1].parts[0].text.trim() === message.trim()
-    ) {
-      history.pop();
-    }
-
-    const contents = [
-      ...history,
-      {
-        role: "user",
-        parts: [{ text: message.trim() }]
-      }
-    ];
-
-    const result = await ai.models.generateContent({
-      model: MODEL,
-      contents: contents,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        temperature: 0.8,
-        maxOutputTokens: 2048
-      }
-    });
-
-    const reply = result.text;
-
-    if (!reply || !reply.trim()) {
-      return res.status(502).json({
-        error: "Gemini returned an empty reply. Please try again."
-      });
-    }
-
-    // Keep a small amount of recent context for this server session.
-    memories[userId].push(
-      { role: "user", content: message.trim() },
-      { role: "assistant", content: reply }
-    );
-
-    memories[userId] = memories[userId].slice(-20);
-
-    return res.json({
-      reply: reply,
-      model: MODEL,
-      status: "success"
-    });
-
-  } catch (error) {
-    console.error("Smile AI error:", error);
-
-    const status = Number(error.status || error.code) || 500;
-
-    return res.status(500).json({
-      error: "Smile AI encountered a server error. Check Render logs.",
-      details: error.message || "Unknown Gemini API error."
-    });
+  if (!isTemporaryError(error) || attempt === 3) {
+    throw error;
   }
+
+  // Wait 2 seconds, then 4 seconds.
+  await sleep(attempt * 2000);
+}
+
+}
+
+throw lastError;
+}
+
+// Main website / health check.
+app.get("/", (req, res) => {
+res.json({
+name: "Smile AI",
+status: "online",
+model: MODEL
+});
 });
 
-// Unknown routes
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found."
+app.get("/health", (req, res) => {
+res.json({
+status: "ok",
+service: "Smile AI",
+model: MODEL,
+configured: Boolean(API_KEY)
+});
+});
+
+// Chat endpoint.
+app.post("/chat", async (req, res) => {
+try {
+if (!ai) {
+return res.status(500).json({
+error: "Smile AI is missing its Gemini API key."
+});
+}
+
+const message = req.body?.message;
+
+if (typeof message !== "string" || !message.trim()) {
+  return res.status(400).json({
+    error: "Please enter a message."
   });
+}
+
+// The frontend may send previous messages.
+let history = Array.isArray(req.body.history)
+  ? req.body.history
+  : [];
+
+history = history
+  .filter(item =>
+    item &&
+    typeof item.content === "string" &&
+    ["user", "assistant", "model"].includes(item.role)
+  )
+  .slice(-20)
+  .map(item => ({
+    role: item.role === "assistant"
+      ? "model"
+      : item.role,
+    parts: [{
+      text: item.content.slice(0, 8000)
+    }]
+  }));
+
+// Avoid including the current message twice.
+const last = history[history.length - 1];
+
+if (
+  last &&
+  last.role === "user" &&
+  last.parts[0].text.trim() === message.trim()
+) {
+  history.pop();
+}
+
+const contents = [
+  ...history,
+  {
+    role: "user",
+    parts: [{ text: message.trim() }]
+  }
+];
+
+const result = await generateWithRetry(contents);
+const reply = result.text;
+
+if (typeof reply !== "string" || !reply.trim()) {
+  return res.status(502).json({
+    error: "Gemini returned an empty reply. Please try again."
+  });
+}
+
+console.log("Smile AI replied successfully.");
+
+return res.json({
+  reply: reply.trim(),
+  model: MODEL,
+  status: "success"
+});
+
+} catch (error) {
+console.error("Smile AI chat error:", error);
+
+const status = getStatus(error);
+
+if ([429, 503, 504].includes(status)) {
+  return res.status(503).json({
+    error: "Smile AI is temporarily busy. Please try again shortly.",
+    details: error.message
+  });
+}
+
+if (status === 404) {
+  return res.status(502).json({
+    error: "The configured Gemini model is unavailable. Check the model name.",
+    details: error.message
+  });
+}
+
+return res.status(500).json({
+  error: "Smile AI encountered a server error. Check Render logs.",
+  details: error.message || "Unknown error"
+});
+
+}
+});
+
+// Handle unknown routes.
+app.use((req, res) => {
+res.status(404).json({
+error: "Route not found."
+});
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("Smile AI server is running on port " + PORT);
-  console.log("Model: " + MODEL);
-  console.log("Gemini API key configured: " + Boolean(API_KEY));
+console.log("Smile AI running on port ${PORT}");
+console.log("Model: ${MODEL}");
+console.log("Gemini API configured: ${Boolean(API_KEY)}");
 });
