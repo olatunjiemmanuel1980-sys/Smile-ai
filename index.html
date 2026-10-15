@@ -2,92 +2,261 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smile AI</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; background: #080b14; color: #f5f7ff;
-      font-family: Arial, sans-serif; min-height: 100vh;
+  <meta name="theme-color" content="#080b14">
+  <title>Smile AI</title>  <style>
+    * {
+      box-sizing: border-box;
     }
-    .hidden { display: none !important; }
+
+    body {
+      margin: 0;
+      background: #080b14;
+      color: #f5f7ff;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
     .card {
-      width: min(92%, 420px); margin: 55px auto; padding: 24px;
-      background: #111827; border: 1px solid #263248;
+      width: 92%;
+      max-width: 420px;
+      margin: 55px auto;
+      padding: 24px;
+      background: #111827;
+      border: 1px solid #263248;
       border-radius: 20px;
     }
-    h1, h2 { text-align: center; }
-    .subtitle { text-align: center; color: #9ca9c0; }
-    input, button {
-      width: 100%; padding: 14px; margin-top: 12px;
-      border-radius: 12px; font-size: 16px;
+
+    h1, h2 {
+      text-align: center;
     }
-    input {
-      color: white; background: #080b14;
-      border: 1px solid #344158; outline: none;
-    }
-    button {
-      background: #6d5dfc; color: white; border: 0;
-      font-weight: bold; cursor: pointer;
-    }
-    button.secondary { background: #202a3d; }
-    #authMessage { color: #ffb4b4; text-align: center; }
-    header {
-      padding: 16px; display: flex; justify-content: space-between;
-      align-items: center; border-bottom: 1px solid #263248;
-      position: sticky; top: 0; background: #080b14;
-    }
-    header h2 { margin: 0; font-size: 20px; }
-    header button { width: auto; margin: 0; padding: 10px 14px; }
-    #chat {
-      max-width: 800px; margin: auto; padding: 18px;
-      min-height: 60vh;
-    }
-    .message {
-      max-width: 88%; padding: 13px 15px; margin: 12px 0;
-      border-radius: 16px; white-space: pre-wrap; overflow-wrap: anywhere;
+
+    .subtitle {
+      text-align: center;
+      color: #9ca9c0;
       line-height: 1.5;
     }
-    .assistant { background: #172033; border: 1px solid #263248; }
-    .user { background: #5145cd; margin-left: auto; }
-    .time { display: block; font-size: 11px; opacity: .65; margin-top: 5px; }
-    #chatForm {
-      position: sticky; bottom: 0; display: flex; gap: 8px;
-      padding: 12px; background: #080b14; border-top: 1px solid #263248;
+
+    input, button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border-radius: 12px;
+      font-size: 16px;
     }
-    #messageInput { flex: 1; min-width: 0; margin: 0; }
-    #sendButton { width: auto; margin: 0; }
-    #status { color: #a5b4fc; font-size: 12px; }
-  </style>
-</head>
-<body>  <section id="authPanel" class="card">
-    <h1>😊 Smile AI</h1>
-    <p class="subtitle">Your AI. Your conversations. Your memories.</p><input id="email" type="email" placeholder="Email address" autocomplete="email">
-<input id="password" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
 
-<button id="signupButton">Create Account</button>
-<button id="loginButton" class="secondary">Log In</button>
-<p id="authMessage" role="status"></p>
+    input {
+      color: white;
+      background: #080b14;
+      border: 1px solid #344158;
+      outline: none;
+    }
 
-  </section>  <section id="appPanel" class="hidden">
-    <header>
-      <div>
-        <h2>😊 Smile AI</h2>
-        <span id="status">Ready</span>
-      </div>
-      <button id="logoutButton" class="secondary">Log Out</button>
-    </header><main id="chat">
-  <div class="message assistant">
-    Heyyy! ❤️ I'm Smile AI. What are we talking about today?
-  </div>
-</main>
+    input:focus {
+      border-color: #8b80ff;
+    }
 
-<form id="chatForm">
-  <input id="messageInput" placeholder="Message Smile AI..." autocomplete="off" required>
-  <button id="sendButton" type="submit">Send</button>
+    button {
+      background: #6d5dfc;
+      color: white;
+      border: 0;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    button.secondary {
+      background: #202a3d;
+    }
+
+    #authMessage {
+      color: #ffb4b4;
+      text-align: center;
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #263248;
+      position: sticky;
+      top: 0;
+      background: #080b14;
+      z-index: 5;
+    }
+
+    header h2 {
+      margin: 0 0 5px;
+      font-size: 20px;
+      text-align: left;
+    }
+
+    header button {
+      width: auto;
+      margin: 0;
+      padding: 10px 14px;
+    }
+
+    #status {
+      color: #a5b4fc;
+      font-size: 12px;
+    }
+
+    #chat {
+      max-width: 800px;
+      margin: auto;
+      padding: 18px;
+      min-height: 60vh;
+      padding-bottom: 100px;
+    }
+
+    .message {
+      max-width: 88%;
+      padding: 13px 15px;
+      margin: 12px 0;
+      border-radius: 16px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
+
+    .assistant {
+      background: #172033;
+      border: 1px solid #263248;
+    }
+
+    .user {
+      background: #5145cd;
+      margin-left: auto;
+    }
+
+    .time {
+      display: block;
+      font-size: 11px;
+      opacity: 0.65;
+      margin-top: 5px;
+    }
+
+    #chatForm {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      background: #080b14;
+      border-top: 1px solid #263248;
+      max-width: 850px;
+      margin: auto;
+    }
+
+    #messageInput {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+    }
+
+    #sendButton {
+      width: auto;
+      margin: 0;
+    }
+
+    .auth-note {
+      color: #9ca9c0;
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: center;
+    }
+  </style></head><body>  <!-- LOGIN AND SIGNUP -->  <section id="authPanel" class="card">
+    <h1>😊 Smile AI</h1><p class="subtitle">
+  Your AI companion. Your conversations. Your memories.
+</p>
+
+<form id="authForm">
+  <input
+    id="email"
+    type="email"
+    placeholder="Email address"
+    autocomplete="email"
+    required
+  >
+
+  <input
+    id="password"
+    type="password"
+    placeholder="Password (at least 6 characters)"
+    autocomplete="current-password"
+    minlength="6"
+    required
+  >
+
+  <button id="loginButton" type="submit">
+    Log In
+  </button>
+
+  <button
+    id="signupButton"
+    type="button"
+    class="secondary"
+  >
+    Create Account
+  </button>
 </form>
 
-  </section>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>  <script>
-    window.SMILE_SUPABASE_URL = "https://iecvuohcuxlalfswwnks.supabase.co";
-  window.SMILE_SUPABASE_KEY = "sb_publishable_OdYSBeNJCCIwm-C96wARHA_wIPBi67m";
-  </script>  <script src="script.js"></script></body>
+<p id="authMessage" role="status" aria-live="polite"></p>
+
+<p class="auth-note">
+  Create an account or log in to start chatting with Smile AI.
+</p>
+
+  </section>  <!-- CHAT APPLICATION -->  <section id="appPanel" class="hidden"><header>
+  <div>
+    <h2>😊 Smile AI</h2>
+    <span id="status">Checking connection...</span>
+  </div>
+
+  <button
+    id="logoutButton"
+    class="secondary"
+    type="button"
+  >
+    Log Out
+  </button>
+</header>
+
+<main id="chat" aria-live="polite"></main>
+
+<form id="chatForm">
+  <input
+    id="messageInput"
+    type="text"
+    placeholder="Message Smile AI..."
+    autocomplete="off"
+    required
+  >
+
+  <button id="sendButton" type="submit">
+    Send
+  </button>
+</form>
+
+  </section>  <!-- LOAD SUPABASE LIBRARY FIRST -->  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>  <!-- SUPABASE PROJECT CONFIGURATION -->  <script>
+    window.SMILE_SUPABASE_URL =
+      "https://iecvuohcuxlalfswwnks.supabase.co";
+
+    window.SMILE_SUPABASE_KEY =
+      "sb_publishable_OdYSBeNJCCIwm-C96wARHA_wIPBi67m";
+  </script>  <!-- LOAD SMILE AI APPLICATION LAST -->  <script src="script.js"></script></body>
 </html>
