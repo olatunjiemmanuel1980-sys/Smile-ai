@@ -1,122 +1,237 @@
 // ==========================================
-// SMILE AI — FIXED CHAT SYSTEM
+// SMILE AI — AUTHENTICATION + CHAT
 // ==========================================
 
+const SUPABASE_URL = window.SMILE_SUPABASE_URL;
+const SUPABASE_KEY = window.SMILE_SUPABASE_KEY;
 const BACKEND_URL = "https://smile-ai-1.onrender.com/chat";
 
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
+
+// ==========================================
+// PAGE ELEMENTS
+// ==========================================
+
+const authPanel = document.getElementById("authPanel");
+const appPanel = document.getElementById("appPanel");
+
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+
+const signupButton = document.getElementById("signupButton");
+const loginButton = document.getElementById("loginButton");
+const logoutButton = document.getElementById("logoutButton");
+
+const authMessage = document.getElementById("authMessage");
 const chat = document.getElementById("chat");
-const form = document.getElementById("chatForm");
-const input = document.getElementById("messageInput");
+const chatForm = document.getElementById("chatForm");
+const messageInput = document.getElementById("messageInput");
 const sendButton = document.getElementById("sendButton");
 const statusText = document.getElementById("status");
 
-let conversation = [];
-let isSending = false;
+let currentUser = null;
+let conversationId = null;
+let sendingMessage = false;
 
 // ==========================================
-// LOAD SAVED CHAT
+// AUTHENTICATION HELPERS
 // ==========================================
 
-try {
-    const saved = localStorage.getItem("smileConversation");
+function showAuth(message = "") {
+    authPanel.classList.remove("hidden");
+    appPanel.classList.add("hidden");
+    authMessage.textContent = message;
+}
 
-    if (saved) {
-        const parsed = JSON.parse(saved);
+function showApp(user) {
+    currentUser = user;
 
-        if (Array.isArray(parsed)) {
-            conversation = parsed.filter(item =>
-                item &&
-                typeof item.content === "string" &&
-                ["user", "assistant", "model"].includes(item.role)
-            ).slice(-50);
-        }
-    }
-} catch (error) {
-    console.error("Could not load chat:", error);
+    authPanel.classList.add("hidden");
+    appPanel.classList.remove("hidden");
+
+    authMessage.textContent = "";
+    statusText.textContent = "🟢 Online";
+
+    // Keep each account's conversation separate on this device.
+    conversationId = localStorage.getItem(
+        "smileConversationId_" + user.id
+    );
+
+    loadLocalMessages();
+
+    messageInput.focus();
+}
+
+function setAuthButtonsDisabled(disabled) {
+    signupButton.disabled = disabled;
+    loginButton.disabled = disabled;
+
+    signupButton.style.opacity = disabled ? "0.6" : "1";
+    loginButton.style.opacity = disabled ? "0.6" : "1";
 }
 
 // ==========================================
-// DISPLAY MESSAGE
+// SIGN UP
 // ==========================================
 
-function addMessage(text, sender) {
+signupButton.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+        authMessage.textContent =
+            "Enter your email address and password.";
+        return;
+    }
+
+    if (password.length < 6) {
+        authMessage.textContent =
+            "Your password must contain at least 6 characters.";
+        return;
+    }
+
+    setAuthButtonsDisabled(true);
+    authMessage.textContent = "Creating your account...";
+
+    try {
+        const { data, error } = await supabaseClient.auth.signUp({
+            email: email,
+            password: password
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        if (data.session && data.user) {
+            showApp(data.user);
+            addMessage(
+                "assistant",
+                "Welcome to Smile AI! ❤️ Your account is ready. Let's chat!"
+            );
+        } else {
+            authMessage.textContent =
+                "Account created! Check your email for the confirmation link, " +
+                "then return here and log in.";
+        }
+    } catch (error) {
+        authMessage.textContent =
+            error.message || "Couldn't create your account. Try again.";
+    } finally {
+        setAuthButtonsDisabled(false);
+    }
+});
+
+// ==========================================
+// LOG IN
+// ==========================================
+
+loginButton.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+        authMessage.textContent =
+            "Enter your email address and password.";
+        return;
+    }
+
+    setAuthButtonsDisabled(true);
+    authMessage.textContent = "Logging in...";
+
+    try {
+        const { data, error } =
+            await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        showApp(data.user);
+    } catch (error) {
+        authMessage.textContent =
+            error.message || "Login failed. Check your details.";
+    } finally {
+        setAuthButtonsDisabled(false);
+    }
+});
+
+// ==========================================
+// LOG OUT
+// ==========================================
+
+logoutButton.addEventListener("click", async () => {
+    logoutButton.disabled = true;
+    statusText.textContent = "Logging out...";
+
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+
+        if (error) {
+            throw error;
+        }
+
+        currentUser = null;
+        conversationId = null;
+
+        showAuth("You've logged out successfully. ❤️");
+    } catch (error) {
+        statusText.textContent =
+            "Logout failed: " + error.message;
+    } finally {
+        logoutButton.disabled = false;
+    }
+});
+
+// ==========================================
+// CHAT DISPLAY
+// ==========================================
+
+function addMessage(role, text, save = true) {
     const message = document.createElement("div");
 
     message.className =
-        "message " + (sender === "user" ? "user" : "bot");
+        "message " + (role === "user" ? "user" : "assistant");
 
-    message.appendChild(
-        document.createTextNode(String(text))
-    );
+    const content = document.createElement("div");
+    content.textContent = text;
 
-    const time = document.createElement("span");
-    time.className = "time";
-
-    time.textContent = new Date().toLocaleTimeString([], {
+    const timestamp = document.createElement("span");
+    timestamp.className = "time";
+    timestamp.textContent = new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
     });
 
-    message.appendChild(time);
-    chat.appendChild(message);
+    message.appendChild(content);
+    message.appendChild(timestamp);
 
+    chat.appendChild(message);
     chat.scrollTop = chat.scrollHeight;
 
-    return message;
-}
-
-// ==========================================
-// SAVE CHAT
-// ==========================================
-
-function saveConversation() {
-    try {
-        localStorage.setItem(
-            "smileConversation",
-            JSON.stringify(conversation.slice(-50))
-        );
-    } catch (error) {
-        console.error("Could not save chat:", error);
+    if (save && currentUser) {
+        saveLocalMessage(role, text);
     }
 }
 
-// ==========================================
-// RESTORE CHAT
-// ==========================================
-
-function restoreConversation() {
-    if (!conversation.length) return;
-
-    chat.innerHTML = "";
-
-    conversation.forEach(item => {
-        const sender =
-            item.role === "user" ? "user" : "bot";
-
-        addMessage(item.content, sender);
-    });
-}
-
-restoreConversation();
-
-// ==========================================
-// TYPING INDICATOR
-// ==========================================
-
 function showTyping() {
-    hideTyping();
-
     const typing = document.createElement("div");
 
     typing.id = "smileTyping";
-    typing.className = "message bot";
-    typing.textContent = "Smile AI is thinking... 💭";
+    typing.className = "message assistant";
+    typing.textContent = "Smile AI is thinking...";
 
     chat.appendChild(typing);
     chat.scrollTop = chat.scrollHeight;
 }
 
-function hideTyping() {
+function removeTyping() {
     const typing = document.getElementById("smileTyping");
 
     if (typing) {
@@ -125,167 +240,233 @@ function hideTyping() {
 }
 
 // ==========================================
-// SEND MESSAGE — WITH TIMEOUT
+// LOCAL CHAT HISTORY
 // ==========================================
 
-async function sendMessage(text) {
-    text = String(text || "").trim();
+function historyKey() {
+    return currentUser
+        ? "smileConversation_" + currentUser.id
+        : null;
+}
 
-    if (!text || isSending) return;
+function saveLocalMessage(role, text) {
+    try {
+        const key = historyKey();
 
-    isSending = true;
+        if (!key) return;
 
-    sendButton.disabled = true;
-    input.disabled = true;
+        const messages = JSON.parse(
+            localStorage.getItem(key) || "[]"
+        );
 
-    // Save the previous conversation before adding this message.
-    const previousHistory = conversation
-        .slice(-20)
-        .map(item => ({
-            role: item.role === "assistant" ? "model" : item.role,
-            content: item.content
-        }));
+        messages.push({
+            role: role,
+            text: text,
+            time: Date.now()
+        });
 
-    // Display the user's message immediately.
-    addMessage(text, "user");
+        localStorage.setItem(
+            key,
+            JSON.stringify(messages.slice(-100))
+        );
+    } catch (error) {
+        console.error("Couldn't save local chat:", error);
+    }
+}
 
-    conversation.push({
-        role: "user",
-        content: text
-    });
-
-    saveConversation();
-
-    input.value = "";
-
-    statusText.textContent = "Connecting to Smile AI...";
-    showTyping();
-
-    // Stop waiting if the backend takes too long.
-    const controller = new AbortController();
-
-    const timeout = setTimeout(() => {
-        controller.abort();
-    }, 45000);
+function loadLocalMessages() {
+    chat.innerHTML = "";
 
     try {
-        const response = await fetch(BACKEND_URL, {
-            method: "POST",
+        const key = historyKey();
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+        if (!key) return;
 
-            body: JSON.stringify({
-                message: text,
-                history: previousHistory
-            }),
+        const messages = JSON.parse(
+            localStorage.getItem(key) || "[]"
+        );
 
-            signal: controller.signal
+        if (messages.length === 0) {
+            addMessage(
+                "assistant",
+                "Heyyy! ❤️ I'm Smile AI. What are we talking about today?",
+                false
+            );
+            return;
+        }
+
+        messages.slice(-100).forEach((item) => {
+            addMessage(item.role, item.text, false);
         });
-
-        const responseText = await response.text();
-
-        let data;
-
-        try {
-            data = JSON.parse(responseText);
-        } catch {
-            throw new Error(
-                "The server returned an invalid response."
-            );
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                data.error ||
-                data.message ||
-                "Server error (" + response.status + ")."
-            );
-        }
-
-        const reply =
-            data.reply ||
-            data.response ||
-            data.text ||
-            data.message;
-
-        if (typeof reply !== "string" || !reply.trim()) {
-            throw new Error(
-                "The server connected, but returned no answer."
-            );
-        }
-
-        hideTyping();
-
-        addMessage(reply, "bot");
-
-        conversation.push({
-            role: "assistant",
-            content: reply
-        });
-
-        conversation = conversation.slice(-50);
-
-        saveConversation();
-
-        statusText.textContent = "Smile AI is online ✨";
-
     } catch (error) {
-        console.error("Smile AI request failed:", error);
+        console.error("Couldn't load local chat:", error);
 
-        hideTyping();
-
-        let errorMessage;
-
-        if (error.name === "AbortError") {
-            errorMessage =
-                "Smile AI took too long to respond. 😕\n\n" +
-                "The AI server may be busy. Please try again.";
-        } else {
-            errorMessage =
-                "I couldn't get a reply right now. 😕\n\n" +
-                error.message +
-                "\n\nPlease try again.";
-        }
-
-        addMessage(errorMessage, "bot");
-
-        statusText.textContent = "Connection problem — try again";
-
-    } finally {
-        clearTimeout(timeout);
-
-        hideTyping();
-
-        isSending = false;
-
-        sendButton.disabled = false;
-        input.disabled = false;
-
-        input.focus();
-
-        chat.scrollTop = chat.scrollHeight;
+        addMessage(
+            "assistant",
+            "Heyyy! ❤️ I'm Smile AI. What are we talking about today?",
+            false
+        );
     }
 }
 
 // ==========================================
-// FORM SUBMISSION
+// SEND MESSAGE TO SMILE AI
 // ==========================================
 
-form.addEventListener("submit", function(event) {
+chatForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    sendMessage(input.value);
+
+    if (!currentUser || sendingMessage) {
+        return;
+    }
+
+    const text = messageInput.value.trim();
+
+    if (!text) {
+        return;
+    }
+
+    sendingMessage = true;
+    sendButton.disabled = true;
+    messageInput.disabled = true;
+
+    addMessage("user", text);
+    messageInput.value = "";
+
+    showTyping();
+    statusText.textContent = "Thinking...";
+
+    try {
+        // Get the latest authenticated session.
+        const {
+            data: { session },
+            error: sessionError
+        } = await supabaseClient.auth.getSession();
+
+        if (sessionError) {
+            throw sessionError;
+        }
+
+        if (!session) {
+            throw new Error("Your session expired. Please log in again.");
+        }
+
+        const response = await fetch(BACKEND_URL, {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + session.access_token
+            },
+
+            body: JSON.stringify({
+                message: text,
+                conversationId: conversationId
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.error ||
+                result.message ||
+                "Smile AI couldn't process your message."
+            );
+        }
+
+        if (!result.reply) {
+            throw new Error("Smile AI returned an empty response.");
+        }
+
+        // Remember the database conversation ID.
+        if (result.conversationId) {
+            conversationId = result.conversationId;
+
+            localStorage.setItem(
+                "smileConversationId_" + currentUser.id,
+                conversationId
+            );
+        }
+
+        removeTyping();
+
+        addMessage("assistant", result.reply);
+
+        statusText.textContent = "🟢 Online";
+
+    } catch (error) {
+        removeTyping();
+
+        console.error("Smile AI error:", error);
+
+        addMessage(
+            "assistant",
+            "Sorry 😭 I couldn't complete that request. " +
+            error.message +
+            "\n\nPlease try again."
+        );
+
+        statusText.textContent = "Connection issue";
+
+    } finally {
+        removeTyping();
+
+        sendingMessage = false;
+        sendButton.disabled = false;
+        messageInput.disabled = false;
+        messageInput.focus();
+    }
 });
 
 // ==========================================
-// SUGGESTION BUTTONS
+// CHECK EXISTING LOGIN SESSION
 // ==========================================
 
-function askSuggestion(text) {
-    sendMessage(text);
+async function startSmileAI() {
+    if (
+        !SUPABASE_URL ||
+        !SUPABASE_KEY ||
+        SUPABASE_KEY === "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE"
+    ) {
+        showAuth(
+            "Supabase setup is incomplete. Check your publishable key in index.html."
+        );
+        return;
+    }
+
+    try {
+        const { data, error } =
+            await supabaseClient.auth.getSession();
+
+        if (error) {
+            throw error;
+        }
+
+        if (data.session && data.session.user) {
+            showApp(data.session.user);
+        } else {
+            showAuth();
+        }
+    } catch (error) {
+        console.error("Session error:", error);
+
+        showAuth(
+            "Couldn't check your login session. Refresh the page and try again."
+        );
+    }
 }
 
-window.askSuggestion = askSuggestion;
+// Listen for login changes and session expiration.
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+        showApp(session.user);
+    } else if (event === "SIGNED_OUT") {
+        currentUser = null;
+        conversationId = null;
+        showAuth();
+    }
+});
 
-console.log("Smile AI chat system loaded successfully!");
+// Start Smile AI.
+startSmileAI();
