@@ -1,180 +1,93 @@
 <!DOCTYPE html><html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#03040a"><title>Smile AI</title>
-
-<!-- Connect the CSS design -->
-<link rel="stylesheet" href="style.css?v=2">
-
-<style>
-    /* Basic fallback design if style.css has a loading problem */
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smile AI</title>
+  <style>
+    * { box-sizing: border-box; }
     body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #03040a;
-        color: #f0f5ff;
+      margin: 0; background: #080b14; color: #f5f7ff;
+      font-family: Arial, sans-serif; min-height: 100vh;
     }
-
-    .app {
-        width: 100%;
-        max-width: 850px;
-        height: 100dvh;
-        margin: auto;
-        display: flex;
-        flex-direction: column;
+    .hidden { display: none !important; }
+    .card {
+      width: min(92%, 420px); margin: 55px auto; padding: 24px;
+      background: #111827; border: 1px solid #263248;
+      border-radius: 20px;
     }
-
-    header {
-        padding: 18px;
-        border-bottom: 1px solid #17334a;
-        background: #080d19;
+    h1, h2 { text-align: center; }
+    .subtitle { text-align: center; color: #9ca9c0; }
+    input, button {
+      width: 100%; padding: 14px; margin-top: 12px;
+      border-radius: 12px; font-size: 16px;
     }
-
-    header h1 {
-        margin: 0;
-        color: #00e5ff;
+    input {
+      color: white; background: #080b14;
+      border: 1px solid #344158; outline: none;
     }
-
-    header p {
-        margin: 6px 0 0;
-        color: #8997b5;
-        font-size: 13px;
-    }
-
-    #chat {
-        flex: 1;
-        overflow-y: auto;
-        padding: 18px;
-    }
-
-    .message {
-        margin: 12px 0;
-        padding: 13px 15px;
-        border-radius: 15px;
-        max-width: 85%;
-        line-height: 1.5;
-        overflow-wrap: anywhere;
-        white-space: pre-wrap;
-    }
-
-    .bot {
-        background: #101b2c;
-        border: 1px solid #16445a;
-        margin-right: auto;
-    }
-
-    .user {
-        background: #123e58;
-        border: 1px solid #00a9d4;
-        margin-left: auto;
-    }
-
-    .time {
-        display: block;
-        margin-top: 6px;
-        font-size: 10px;
-        color: #8997b5;
-    }
-
-    .suggestions {
-        display: flex;
-        gap: 8px;
-        padding: 0 12px 12px;
-        overflow-x: auto;
-    }
-
-    .suggestions button {
-        flex-shrink: 0;
-        background: #101b2c;
-        border: 1px solid #00a9d4;
-        color: #00e5ff;
-        padding: 9px 12px;
-        border-radius: 20px;
-    }
-
-    form {
-        display: flex;
-        gap: 8px;
-        padding: 12px;
-        background: #080d19;
-        border-top: 1px solid #17334a;
-    }
-
-    #messageInput {
-        flex: 1;
-        min-width: 0;
-        padding: 13px;
-        border-radius: 25px;
-        border: 1px solid #29445e;
-        background: #101725;
-        color: white;
-        outline: none;
-    }
-
-    #sendButton {
-        padding: 0 18px;
-        border: none;
-        border-radius: 25px;
-        background: #00cce8;
-        color: #03040a;
-        font-weight: bold;
-    }
-
     button {
-        cursor: pointer;
+      background: #6d5dfc; color: white; border: 0;
+      font-weight: bold; cursor: pointer;
     }
-
-    #status {
-        color: #8997b5;
-        font-size: 12px;
+    button.secondary { background: #202a3d; }
+    #authMessage { color: #ffb4b4; text-align: center; }
+    header {
+      padding: 16px; display: flex; justify-content: space-between;
+      align-items: center; border-bottom: 1px solid #263248;
+      position: sticky; top: 0; background: #080b14;
     }
-</style>
+    header h2 { margin: 0; font-size: 20px; }
+    header button { width: auto; margin: 0; padding: 10px 14px; }
+    #chat {
+      max-width: 800px; margin: auto; padding: 18px;
+      min-height: 60vh;
+    }
+    .message {
+      max-width: 88%; padding: 13px 15px; margin: 12px 0;
+      border-radius: 16px; white-space: pre-wrap; overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
+    .assistant { background: #172033; border: 1px solid #263248; }
+    .user { background: #5145cd; margin-left: auto; }
+    .time { display: block; font-size: 11px; opacity: .65; margin-top: 5px; }
+    #chatForm {
+      position: sticky; bottom: 0; display: flex; gap: 8px;
+      padding: 12px; background: #080b14; border-top: 1px solid #263248;
+    }
+    #messageInput { flex: 1; min-width: 0; margin: 0; }
+    #sendButton { width: auto; margin: 0; }
+    #status { color: #a5b4fc; font-size: 12px; }
+  </style>
+</head>
+<body>  <section id="authPanel" class="card">
+    <h1>😊 Smile AI</h1>
+    <p class="subtitle">Your AI. Your conversations. Your memories.</p><input id="email" type="email" placeholder="Email address" autocomplete="email">
+<input id="password" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
 
-</head><body>
-    <div class="app">    <header>
-        <h1>😊 Smile AI</h1>
-        <p>● Your AI friend is online</p>
-        <p id="status">Ready to chat ✨</p>
-    </header>
+<button id="signupButton">Create Account</button>
+<button id="loginButton" class="secondary">Log In</button>
+<p id="authMessage" role="status"></p>
 
-    <main id="chat" aria-live="polite">
-        <div class="message bot">
-            Heyyy! 🥰 I'm Smile AI, your AI friend. What are we talking about today?
-            <span class="time">Now</span>
-        </div>
-    </main>
+  </section>  <section id="appPanel" class="hidden">
+    <header>
+      <div>
+        <h2>😊 Smile AI</h2>
+        <span id="status">Ready</span>
+      </div>
+      <button id="logoutButton" class="secondary">Log Out</button>
+    </header><main id="chat">
+  <div class="message assistant">
+    Heyyy! ❤️ I'm Smile AI. What are we talking about today?
+  </div>
+</main>
 
-    <div class="suggestions">
-        <button type="button" onclick="askSuggestion('Tell me something funny 😂')">
-            😂 Tell me a joke
-        </button>
+<form id="chatForm">
+  <input id="messageInput" placeholder="Message Smile AI..." autocomplete="off" required>
+  <button id="sendButton" type="submit">Send</button>
+</form>
 
-        <button type="button" onclick="askSuggestion('What do you know about football? ⚽')">
-            ⚽ Football
-        </button>
-
-        <button type="button" onclick="askSuggestion('Give me some life advice')">
-            💭 Life advice
-        </button>
-    </div>
-
-    <form id="chatForm">
-        <input
-            id="messageInput"
-            type="text"
-            placeholder="Message Smile AI..."
-            autocomplete="off"
-            required
-        >
-
-        <button id="sendButton" type="submit">Send ➤</button>
-    </form>
-
-</div>
-
-<!-- Connect the JavaScript -->
-<script src="script.js"></script>
-
-</body>
+  </section>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>  <script>
+    window.SMILE_SUPABASE_URL = "https://iecvuohcuxlalfswwnks.supabase.co";
+    window.SMILE_SUPABASE_KEY = "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
+  </script>  <script src="script.js"></script></body>
 </html>
