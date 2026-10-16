@@ -9,15 +9,22 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 10000;
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+// Web search is disabled unless explicitly enabled.
+const GOOGLE_SEARCH_ENABLED =
+  process.env.ENABLE_GOOGLE_SEARCH === "true";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const ai = GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+  ? new GoogleGenAI({
+      apiKey: GEMINI_API_KEY
+    })
   : null;
 
 const supabase =
@@ -35,32 +42,74 @@ const supabase =
       )
     : null;
 
+
+// ========================================
+// SMILE AI'S BRAIN
+// ========================================
+
 const SYSTEM_PROMPT = `
-You are Smile AI, a friendly, intelligent and helpful AI assistant.
+You are Smile AI, a friendly, intelligent, thoughtful AI assistant.
 
-PERSONALITY:
-- Be warm, natural, friendly and occasionally funny.
-- Explain difficult subjects in simple steps.
-- Use Nigerian English or Pidgin when appropriate.
+YOUR PERSONALITY:
+- Be friendly, natural, helpful and occasionally funny.
+- Speak clearly and naturally.
+- Use Nigerian English or Nigerian Pidgin when appropriate.
 - Do not overuse emojis.
-- Never pretend to know something you do not know.
+- Adapt your explanations to the user's level of understanding.
+- Be respectful, patient and encouraging.
 
-ABILITIES:
-- Help with mathematics, science, schoolwork and presentations.
-- Help with HTML, CSS, JavaScript and debugging.
-- Discuss football, games and technology.
-- Explain calculations step by step.
-- Be honest about limitations.
+INTELLIGENCE:
+- Understand the user's actual question before answering.
+- Break difficult problems into manageable steps.
+- Consider different possible solutions before recommending one.
+- Check your calculations and reasoning for obvious errors.
+- Explain important conclusions clearly.
+- Ask a clarifying question when essential information is missing.
+- Never invent facts to make an answer sound convincing.
+- Clearly acknowledge uncertainty when appropriate.
 
-MEMORY:
-- Use the saved memories supplied in the conversation.
-- Use previous conversation messages when supplied.
-- Only treat information in the supplied memories as established facts.
-- Do not claim to remember information that is not available.
+MATHEMATICS AND SCIENCE:
+- Solve mathematical problems step by step.
+- Explain formulas and show how they are applied.
+- Check answers where practical.
+- Explain scientific concepts using understandable examples.
+- Help with school assignments and presentations.
+
+PROGRAMMING AND CODING:
+- Help with JavaScript, HTML, CSS, Python, Node.js and other languages.
+- Write complete code when the user requests a complete file.
+- Explain code in simple language.
+- Identify likely bugs and suggest practical fixes.
+- Preserve existing functionality when modifying a project.
+- Never claim that code has been tested or executed unless it actually has.
+- Explain where code belongs and how to use it.
+- Consider security, performance and reliability when recommending solutions.
+
+CURRENT INFORMATION:
+- Your built-in knowledge might not include recent developments.
+- When Google Search is available, use it when current information would materially improve the answer.
+- Do not claim to have searched the web unless the search tool was actually used.
+- When search results provide sources, include useful source links.
+- Distinguish verified information from assumptions.
+
+CONVERSATION AND MEMORY:
+- Use the conversation history provided to you.
+- Use saved memories supplied in the prompt when relevant.
+- Do not claim to remember information that was not supplied.
 - Never reveal one user's private information to another user.
 
-Give useful, direct answers.
+HONESTY:
+- Never pretend to access websites, files, accounts or tools that you cannot access.
+- Never claim an action succeeded unless there is evidence that it succeeded.
+- If a request cannot be completed, explain the limitation and suggest a practical alternative.
+
+Your goal is to provide accurate, useful and understandable answers.
 `;
+
+
+// ========================================
+// BASIC ROUTES
+// ========================================
 
 app.get("/", (req, res) => {
   res.json({
@@ -69,17 +118,23 @@ app.get("/", (req, res) => {
   });
 });
 
+
 app.get("/health", (req, res) => {
   res.json({
     name: "Smile AI",
     status: "online",
     geminiConfigured: Boolean(ai),
     supabaseConfigured: Boolean(supabase),
+    googleSearchEnabled: GOOGLE_SEARCH_ENABLED,
     model: MODEL
   });
 });
 
-// Verify the signed-in user using their Supabase access token.
+
+// ========================================
+// AUTHENTICATION
+// ========================================
+
 async function authenticate(req, res, next) {
   try {
     if (!supabase) {
@@ -88,8 +143,12 @@ async function authenticate(req, res, next) {
       });
     }
 
-    const authorization = req.headers.authorization || "";
-    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    const authorization =
+      req.headers.authorization || "";
+
+    const match = authorization.match(
+      /^Bearer\s+(.+)$/i
+    );
 
     if (!match) {
       return res.status(401).json({
@@ -97,24 +156,36 @@ async function authenticate(req, res, next) {
       });
     }
 
-    const { data, error } = await supabase.auth.getUser(match[1]);
+    const { data, error } =
+      await supabase.auth.getUser(match[1]);
 
     if (error || !data.user) {
       return res.status(401).json({
-        error: "Your session is invalid or expired. Please sign in again."
+        error:
+          "Your session is invalid or expired. Please sign in again."
       });
     }
 
     req.user = data.user;
+
     next();
+
   } catch (error) {
-    console.error("Authentication error:", error.message);
+    console.error(
+      "Authentication error:",
+      error.message
+    );
 
     return res.status(401).json({
       error: "Could not verify your account."
     });
   }
 }
+
+
+// ========================================
+// CHAT
+// ========================================
 
 app.post("/chat", authenticate, async (req, res) => {
   try {
@@ -143,17 +214,21 @@ app.post("/chat", authenticate, async (req, res) => {
 
     const text = message.trim().slice(0, 6000);
 
-    // Create a conversation for this authenticated user,
-    // or verify ownership of the requested conversation.
+
+    // ====================================
+    // CONVERSATION MANAGEMENT
+    // ====================================
+
     let activeConversationId = conversationId;
 
     if (activeConversationId) {
-      const { data: existing, error } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("id", activeConversationId)
-        .eq("user_id", userId)
-        .maybeSingle();
+      const { data: existing, error } =
+        await supabase
+          .from("conversations")
+          .select("id")
+          .eq("id", activeConversationId)
+          .eq("user_id", userId)
+          .maybeSingle();
 
       if (error) throw error;
 
@@ -162,78 +237,116 @@ app.post("/chat", authenticate, async (req, res) => {
           error: "Conversation not found."
         });
       }
+
     } else {
-      const { data: created, error } = await supabase
-        .from("conversations")
-        .insert({
-          user_id: userId,
-          title: text.slice(0, 70)
-        })
-        .select("id")
-        .single();
+      const { data: created, error } =
+        await supabase
+          .from("conversations")
+          .insert({
+            user_id: userId,
+            title: text.slice(0, 70)
+          })
+          .select("id")
+          .single();
 
       if (error) throw error;
 
       activeConversationId = created.id;
     }
 
-    // Save the user's message.
-    const { error: userMessageError } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: activeConversationId,
-        user_id: userId,
-        role: "user",
-        content: text
-      });
 
-    if (userMessageError) throw userMessageError;
+    // ====================================
+    // SAVE USER MESSAGE
+    // ====================================
 
-    // Retrieve only this user's saved memories.
-    const { data: savedMemories, error: memoryError } =
+    const { error: userMessageError } =
       await supabase
-        .from("memories")
-        .select("id, memory")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(30);
+        .from("messages")
+        .insert({
+          conversation_id: activeConversationId,
+          user_id: userId,
+          role: "user",
+          content: text
+        });
+
+    if (userMessageError) {
+      throw userMessageError;
+    }
+
+
+    // ====================================
+    // LOAD SAVED MEMORIES
+    // ====================================
+
+    const {
+      data: savedMemories,
+      error: memoryError
+    } = await supabase
+      .from("memories")
+      .select("id, memory")
+      .eq("user_id", userId)
+      .order("created_at", {
+        ascending: false
+      })
+      .limit(30);
 
     if (memoryError) throw memoryError;
+
+
+    // ====================================
+    // REMEMBER REQUESTS
+    // ====================================
+
+    const rememberMatch = text.match(
+      /^(?:smile(?:\s+ai)?[,\s]*)?(?:please\s+)?remember(?:\s+that)?\s+(.+)$/i
+    );
+
+    if (
+      rememberMatch &&
+      rememberMatch[1].trim()
+    ) {
+      const memory = rememberMatch[1]
+        .trim()
+        .slice(0, 1000);
+
+      const { error: saveMemoryError } =
+        await supabase
+          .from("memories")
+          .insert({
+            user_id: userId,
+            memory
+          });
+
+      if (saveMemoryError) {
+        throw saveMemoryError;
+      }
+
+      savedMemories.unshift({
+        memory
+      });
+    }
 
     const memoryText = (savedMemories || [])
       .map(item => "- " + item.memory)
       .join("\n");
 
-    // Store a memory only when the user explicitly asks
-    // Smile AI to remember something.
-    const rememberMatch = text.match(
-      /^(?:smile(?:\s+ai)?[,\s]*)?(?:please\s+)?remember(?:\s+that)?\s+(.+)$/i
-    );
 
-    if (rememberMatch && rememberMatch[1].trim()) {
-      const memory = rememberMatch[1].trim().slice(0, 1000);
+    // ====================================
+    // LOAD CONVERSATION HISTORY
+    // ====================================
 
-      const { error: saveMemoryError } = await supabase
-        .from("memories")
-        .insert({
-          user_id: userId,
-          memory
-        });
-
-      if (saveMemoryError) throw saveMemoryError;
-
-      savedMemories.unshift({ memory });
-    }
-
-    // Load recent messages from this conversation.
-    const { data: recentMessages, error: historyError } =
-      await supabase
-        .from("messages")
-        .select("role, content")
-        .eq("user_id", userId)
-        .eq("conversation_id", activeConversationId)
-        .order("created_at", { ascending: false })
-        .limit(13);
+    const {
+      data: recentMessages,
+      error: historyError
+    } = await supabase
+      .from("messages")
+      .select("role, content")
+      .eq("user_id", userId)
+      .eq("conversation_id", activeConversationId)
+      .order("created_at", {
+        ascending: false
+      })
+      .limit(13);
 
     if (historyError) throw historyError;
 
@@ -241,11 +354,21 @@ app.post("/chat", authenticate, async (req, res) => {
       .reverse()
       .slice(0, -1)
       .map(item => ({
-        role: item.role === "assistant" ? "model" : "user",
-        parts: [{ text: item.content.slice(0, 6000) }]
+        role:
+          item.role === "assistant"
+            ? "model"
+            : "user",
+        parts: [
+          {
+            text: item.content.slice(0, 6000)
+          }
+        ]
       }));
 
-    // Use browser history only when database history is empty.
+
+    // Use browser history only when database
+    // history is empty.
+
     const safeHistory = dbHistory.length
       ? dbHistory
       : Array.isArray(history)
@@ -258,40 +381,125 @@ app.post("/chat", authenticate, async (req, res) => {
             .slice(-12)
             .map(item => ({
               role: item.role,
-              parts: [{ text: item.content.slice(0, 6000) }]
+              parts: [
+                {
+                  text: item.content.slice(0, 6000)
+                }
+              ]
             }))
         : [];
+
 
     const contents = [
       ...safeHistory,
       {
         role: "user",
-        parts: [{ text }]
+        parts: [
+          {
+            text
+          }
+        ]
       }
     ];
+
+
+    // ====================================
+    // GENERATE AI RESPONSE
+    // ====================================
+
+    const config = {
+      systemInstruction:
+        SYSTEM_PROMPT +
+        "\n\nSAVED MEMORIES FOR THIS USER:\n" +
+        (memoryText || "No saved memories yet."),
+
+      maxOutputTokens: 2048
+    };
+
+
+    // Google Search is optional.
+    // It remains disabled unless explicitly
+    // enabled in the Render environment.
+
+    if (GOOGLE_SEARCH_ENABLED) {
+      config.tools = [
+        {
+          googleSearch: {}
+        }
+      ];
+    }
+
 
     const result = await ai.models.generateContent({
       model: MODEL,
       contents,
-      config: {
-        systemInstruction:
-          SYSTEM_PROMPT +
-          "\n\nSAVED MEMORIES FOR THIS USER:\n" +
-          (memoryText || "No saved memories yet."),
-        maxOutputTokens: 2048
-      }
+      config
     });
 
-    const reply = result.text;
 
-    if (!reply || !reply.trim()) {
+    let reply = result.text || "";
+
+
+    // ====================================
+    // SEARCH SOURCES
+    // ====================================
+
+    if (GOOGLE_SEARCH_ENABLED) {
+      const chunks =
+        result.candidates?.[0]
+          ?.groundingMetadata
+          ?.groundingChunks || [];
+
+      const sources = [];
+      const seenUrls = new Set();
+
+      for (const chunk of chunks) {
+        const web = chunk.web;
+
+        if (
+          web?.uri &&
+          !seenUrls.has(web.uri)
+        ) {
+          seenUrls.add(web.uri);
+
+          sources.push({
+            title: web.title || web.uri,
+            uri: web.uri
+          });
+        }
+      }
+
+      if (sources.length > 0) {
+        reply +=
+          "\n\nSources:\n" +
+          sources
+            .slice(0, 5)
+            .map(source =>
+              "- " +
+              source.title +
+              ": " +
+              source.uri
+            )
+            .join("\n");
+      }
+    }
+
+
+    if (!reply.trim()) {
       return res.status(502).json({
-        error: "Smile AI received an empty response. Please try again."
+        error:
+          "Smile AI received an empty response. Please try again."
       });
     }
 
-    // Save the AI response.
-    const { error: assistantMessageError } = await supabase
+
+    // ====================================
+    // SAVE AI RESPONSE
+    // ====================================
+
+    const {
+      error: assistantMessageError
+    } = await supabase
       .from("messages")
       .insert({
         conversation_id: activeConversationId,
@@ -300,13 +508,25 @@ app.post("/chat", authenticate, async (req, res) => {
         content: reply.trim()
       });
 
-    if (assistantMessageError) throw assistantMessageError;
+    if (assistantMessageError) {
+      throw assistantMessageError;
+    }
+
+
+    // Update conversation activity.
 
     await supabase
       .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
+      .update({
+        updated_at: new Date().toISOString()
+      })
       .eq("id", activeConversationId)
       .eq("user_id", userId);
+
+
+    // ====================================
+    // SEND RESPONSE TO FRONTEND
+    // ====================================
 
     return res.json({
       reply: reply.trim(),
@@ -315,10 +535,17 @@ app.post("/chat", authenticate, async (req, res) => {
       conversationId: activeConversationId
     });
 
-  } catch (error) {
-    console.error("Smile AI error:", error.message);
 
-    const message = String(error.message || "").toLowerCase();
+  } catch (error) {
+    console.error(
+      "Smile AI error:",
+      error.message
+    );
+
+    const message = String(
+      error.message || ""
+    ).toLowerCase();
+
 
     if (
       message.includes("quota") ||
@@ -326,27 +553,58 @@ app.post("/chat", authenticate, async (req, res) => {
       message.includes("429")
     ) {
       return res.status(429).json({
-        error: "Gemini's rate limit has been reached. Please try again later."
+        error:
+          "Gemini's rate limit has been reached. Please try again later."
       });
     }
+
 
     if (
       message.includes("503") ||
       message.includes("overloaded")
     ) {
       return res.status(503).json({
-        error: "Gemini is busy right now. Please try again shortly."
+        error:
+          "Gemini is busy right now. Please try again shortly."
       });
     }
 
+
+    console.error(
+      "Full error details:",
+      error
+    );
+
     return res.status(500).json({
-      error: "Smile AI encountered a server error. Please try again."
+      error:
+        "Smile AI encountered a server error. Please try again."
     });
   }
 });
 
+
+// ========================================
+// START SERVER
+// ========================================
+
 app.listen(PORT, () => {
-  console.log(`Smile AI running on port ${PORT}`);
-  console.log(`Gemini configured: ${Boolean(ai)}`);
-  console.log(`Supabase configured: ${Boolean(supabase)}`);
+  console.log(
+    `Smile AI running on port ${PORT}`
+  );
+
+  console.log(
+    `Gemini configured: ${Boolean(ai)}`
+  );
+
+  console.log(
+    `Supabase configured: ${Boolean(supabase)}`
+  );
+
+  console.log(
+    `Google Search enabled: ${GOOGLE_SEARCH_ENABLED}`
+  );
+
+  console.log(
+    `Model: ${MODEL}`
+  );
 });
