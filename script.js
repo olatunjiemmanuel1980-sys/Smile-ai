@@ -1,5 +1,5 @@
 // ==========================================
-// SMILE AI — GOOGLE LOGIN + CLICKABLE LINKS
+// SMILE AI — GOOGLE LOGIN + WEB SEARCH
 // ==========================================
 
 const SUPABASE_URL = window.SMILE_SUPABASE_URL;
@@ -31,6 +31,7 @@ if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) {
     "Smile AI setup is incomplete. Check Supabase configuration.";
 
   googleLoginButton.disabled = true;
+
   throw new Error("Supabase configuration is missing.");
 }
 
@@ -40,45 +41,53 @@ const supabaseClient = window.supabase.createClient(
 );
 
 // ==========================================
-// SAFE CLICKABLE LINKS
+// CLICKABLE WEBSITE LINKS
 // ==========================================
 
 function renderMessageContent(container, text) {
   container.replaceChildren();
 
-  const urlPattern = /https?:\/\/[^\s<>"']+/gi;
   const sourceText = String(text || "");
+
+  // Support both normal URLs and Markdown links.
+  const pattern =
+    /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>"']+)/gi;
+
   let lastIndex = 0;
   let match;
 
-  while ((match = urlPattern.exec(sourceText)) !== null) {
-    const rawUrl = match[0];
+  while ((match = pattern.exec(sourceText)) !== null) {
+    container.appendChild(
+      document.createTextNode(
+        sourceText.slice(lastIndex, match.index)
+      )
+    );
 
-    // Keep punctuation outside the clickable link.
+    const label = match[1] || "";
+    const markdownUrl = match[2] || "";
+    const rawUrl = markdownUrl || match[3];
+
     const trailingMatch = rawUrl.match(/[),.!?;:]+$/);
     const trailing = trailingMatch ? trailingMatch[0] : "";
+
     const url = trailing
       ? rawUrl.slice(0, -trailing.length)
       : rawUrl;
 
-    // Display normal text before the URL.
-    container.appendChild(
-      document.createTextNode(sourceText.slice(lastIndex, match.index))
-    );
-
     try {
       const parsedUrl = new URL(url);
 
-      // Only allow ordinary HTTP/HTTPS website links.
-      if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
+      if (
+        parsedUrl.protocol === "https:" ||
+        parsedUrl.protocol === "http:"
+      ) {
         const link = document.createElement("a");
 
         link.href = parsedUrl.href;
-        link.textContent = url;
+        link.textContent = label || url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
 
-        // Make links easy to tap on mobile.
         link.style.color = "#66b3ff";
         link.style.textDecoration = "underline";
         link.style.overflowWrap = "anywhere";
@@ -86,27 +95,48 @@ function renderMessageContent(container, text) {
 
         container.appendChild(link);
       } else {
-        container.appendChild(document.createTextNode(url));
+        container.appendChild(
+          document.createTextNode(label || url)
+        );
       }
     } catch {
-      container.appendChild(document.createTextNode(url));
+      container.appendChild(
+        document.createTextNode(label || url)
+      );
     }
 
     if (trailing) {
-      container.appendChild(document.createTextNode(trailing));
+      container.appendChild(
+        document.createTextNode(trailing)
+      );
     }
 
-    lastIndex = match.index + rawUrl.length;
+    lastIndex = match.index + match[0].length;
   }
 
-  // Add the remaining text after the last URL.
   container.appendChild(
     document.createTextNode(sourceText.slice(lastIndex))
   );
 
-  // Preserve line breaks in the AI's answer.
   container.style.whiteSpace = "pre-wrap";
   container.style.overflowWrap = "anywhere";
+}
+
+// ==========================================
+// DETECT WHEN WEB SEARCH IS NEEDED
+// ==========================================
+
+function shouldRequestWebSearch(text) {
+  const pattern =
+    /\b(latest|today|yesterday|yesterday's|last night|last week|this morning|this afternoon|tonight|tomorrow|current|currently|recent|recently|news|now|2026|2025|live|score|scores|result|results|weather|price|prices|president|coach|manager|transfer|transfers|standings|table|fixtures|schedule|who won|this season|breaking|update|updates|trending|trend|viral|search|browse|internet|online|web|look up|find online|research|fact check|verify|source|sources|what happened|release date|election|exchange rate|newest|announced|announcement|rumour|rumor|injury|injuries|lineup|line-up|starting eleven|kickoff|kick-off)\b/i;
+
+  const eventPattern =
+    /\b(what did .+ play|who did .+ play|who is .+ playing|when does .+ play|when is .+ playing|did .+ win|has .+ won|has .+ signed|is .+ injured|who scored|who is the coach|who is the manager|who is the president|what is happening|what's happening|what is going on|what's going on|any news about|tell me the latest about)\b/i;
+
+  return (
+    pattern.test(String(text || "")) ||
+    eventPattern.test(String(text || ""))
+  );
 }
 
 // ==========================================
@@ -116,6 +146,7 @@ function renderMessageContent(container, text) {
 function showAuth(message = "") {
   authPanel.classList.remove("hidden");
   appPanel.classList.add("hidden");
+
   authMessage.textContent = message;
   currentUser = null;
 }
@@ -139,8 +170,10 @@ googleLoginButton.addEventListener("click", async () => {
     if (error) throw error;
   } catch (error) {
     console.error("Google login error:", error);
+
     authMessage.textContent =
       error.message || "Google login failed. Please try again.";
+
     googleLoginButton.disabled = false;
   }
 });
@@ -153,10 +186,12 @@ function showApp(user) {
   if (!user) return;
 
   const isNewUser = currentUser?.id !== user.id;
+
   currentUser = user;
 
   authPanel.classList.add("hidden");
   appPanel.classList.remove("hidden");
+
   statusText.textContent = "🟢 Online";
 
   if (isNewUser) {
@@ -178,6 +213,7 @@ logoutButton.addEventListener("click", async () => {
 
   try {
     const { error } = await supabaseClient.auth.signOut();
+
     if (error) throw error;
 
     currentUser = null;
@@ -186,7 +222,9 @@ logoutButton.addEventListener("click", async () => {
     showAuth("You've logged out successfully. ❤️");
   } catch (error) {
     console.error("Logout error:", error);
-    statusText.textContent = "Logout failed: " + error.message;
+
+    statusText.textContent =
+      "Logout failed: " + error.message;
   } finally {
     logoutButton.disabled = false;
   }
@@ -204,11 +242,12 @@ function addMessage(role, text, save = true) {
 
   const content = document.createElement("div");
 
-  // URLs are converted into safe, clickable links here.
   renderMessageContent(content, text);
 
   const timestamp = document.createElement("span");
+
   timestamp.className = "time";
+
   timestamp.textContent = new Date().toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit"
@@ -216,8 +255,8 @@ function addMessage(role, text, save = true) {
 
   message.appendChild(content);
   message.appendChild(timestamp);
-  chat.appendChild(message);
 
+  chat.appendChild(message);
   chat.scrollTop = chat.scrollHeight;
 
   if (save && currentUser) {
@@ -233,6 +272,7 @@ function showTyping() {
   removeTyping();
 
   const typing = document.createElement("div");
+
   typing.id = "smileTyping";
   typing.className = "message assistant";
   typing.textContent = "Smile AI is thinking...";
@@ -243,6 +283,7 @@ function showTyping() {
 
 function removeTyping() {
   const typing = document.getElementById("smileTyping");
+
   if (typing) typing.remove();
 }
 
@@ -259,9 +300,12 @@ function historyKey() {
 function saveLocalMessage(role, text) {
   try {
     const key = historyKey();
+
     if (!key) return;
 
-    const messages = JSON.parse(localStorage.getItem(key) || "[]");
+    const messages = JSON.parse(
+      localStorage.getItem(key) || "[]"
+    );
 
     messages.push({
       role,
@@ -283,9 +327,12 @@ function loadLocalMessages() {
 
   try {
     const key = historyKey();
+
     if (!key) return;
 
-    const messages = JSON.parse(localStorage.getItem(key) || "[]");
+    const messages = JSON.parse(
+      localStorage.getItem(key) || "[]"
+    );
 
     if (messages.length === 0) {
       addMessage(
@@ -293,6 +340,7 @@ function loadLocalMessages() {
         "Heyyy! ❤️ I'm Smile AI. What are we talking about today?",
         false
       );
+
       return;
     }
 
@@ -320,16 +368,20 @@ chatForm.addEventListener("submit", async (event) => {
   if (!currentUser || sendingMessage) return;
 
   const text = messageInput.value.trim();
+
   if (!text) return;
 
   sendingMessage = true;
+
   sendButton.disabled = true;
   messageInput.disabled = true;
 
   addMessage("user", text);
+
   messageInput.value = "";
 
   showTyping();
+
   statusText.textContent = "Thinking...";
 
   try {
@@ -348,13 +400,16 @@ chatForm.addEventListener("submit", async (event) => {
 
     const response = await fetch(BACKEND_URL, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + session.access_token
       },
+
       body: JSON.stringify({
         message: text,
-        conversationId
+        conversationId,
+        search: shouldRequestWebSearch(text)
       })
     });
 
@@ -382,11 +437,20 @@ chatForm.addEventListener("submit", async (event) => {
     }
 
     removeTyping();
+
     addMessage("assistant", result.reply);
 
-    statusText.textContent = "🟢 Online";
+    // If a search was requested but failed, show a status indicator.
+    if (result.searchError && !result.searched) {
+      statusText.textContent = "🟠 Search unavailable";
+    } else if (result.searched) {
+      statusText.textContent = "🟢 Answer includes web search";
+    } else {
+      statusText.textContent = "🟢 Online";
+    }
   } catch (error) {
     removeTyping();
+
     console.error("Smile AI error:", error);
 
     addMessage(
@@ -401,8 +465,10 @@ chatForm.addEventListener("submit", async (event) => {
     removeTyping();
 
     sendingMessage = false;
+
     sendButton.disabled = false;
     messageInput.disabled = false;
+
     messageInput.focus();
   }
 });
@@ -413,7 +479,11 @@ chatForm.addEventListener("submit", async (event) => {
 
 async function startSmileAI() {
   try {
-    const { data, error } = await supabaseClient.auth.getSession();
+    const {
+      data,
+      error
+    } = await supabaseClient.auth.getSession();
+
     if (error) throw error;
 
     if (data.session?.user) {
