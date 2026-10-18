@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require("@supabase/supabase-js");
+const { tavily } = require("@tavily/core");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -11,7 +12,6 @@ const PORT = process.env.PORT || 10000;
 // ==========================================
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
 const GEMINI_MODEL =
   process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
@@ -28,6 +28,12 @@ const supabase =
   SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+
+// If a Tavily key exists, use it.
+// If no key exists, the official SDK can try keyless mode.
+const tavilyClient = TAVILY_API_KEY
+  ? tavily({ apiKey: TAVILY_API_KEY })
+  : tavily();
 
 // ==========================================
 // MIDDLEWARE
@@ -60,7 +66,7 @@ PERSONALITY:
 - Be funny sometimes, but do not force jokes.
 - Nigerian English or Pidgin is welcome when appropriate.
 - Do not use too many emojis.
-- Do not bring up football unless relevant to the conversation.
+- Do not bring up football unless it is relevant.
 - Adapt your answers to the user's question.
 
 CAPABILITIES:
@@ -106,7 +112,8 @@ app.get("/health", (req, res) => {
     supabaseConfigured: Boolean(
       SUPABASE_URL && SUPABASE_ANON_KEY
     ),
-    tavilySearchConfigured: Boolean(TAVILY_API_KEY)
+    tavilySearchConfigured: true,
+    tavilyMode: TAVILY_API_KEY ? "api-key" : "keyless"
   });
 });
 
@@ -115,58 +122,28 @@ app.get("/health", (req, res) => {
 // ==========================================
 
 async function searchWeb(query) {
-  if (!TAVILY_API_KEY) {
-    console.error("Tavily API key is missing.");
-
-    return {
-      available: false,
-      answer: "",
-      results: [],
-      error: "TAVILY_API_KEY is not configured."
-    };
-  }
-
   try {
-    const response = await fetch(
-      "https://api.tavily.com/search",
-      {
-        method: "POST",
+    const cleanQuery = String(query || "")
+      .trim()
+      .slice(0, 400);
 
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${TAVILY_API_KEY}`
-        },
-
-        body: JSON.stringify({
-          query: String(query).slice(0, 400),
-          search_depth: "basic",
-          topic: "general",
-          max_results: 5,
-          include_answer: true
-        }),
-
-        signal: AbortSignal.timeout(20000)
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      console.error(
-        "Tavily search error:",
-        response.status,
-        errorText.slice(0, 500)
-      );
-
+    if (!cleanQuery) {
       return {
         available: false,
         answer: "",
         results: [],
-        error: `Tavily returned HTTP ${response.status}.`
+        error: "Please provide a search query."
       };
     }
 
-    const data = await response.json();
+    console.log("Smile AI searching the web:", cleanQuery);
+
+    const data = await tavilyClient.search(cleanQuery, {
+      searchDepth: "basic",
+      topic: "general",
+      maxResults: 5,
+      includeAnswer: true
+    });
 
     const results = (data.results || []).map((item) => ({
       title: item.title || "Untitled result",
@@ -175,41 +152,66 @@ async function searchWeb(query) {
       score: item.score
     }));
 
-    if (results.length === 0) {
-      console.error("Tavily returned zero results.");
+    const answer = data.answer || "";
 
+    if (results.length === 0 && !answer) {
       return {
         available: false,
-        answer: data.answer || "",
+        answer: "",
         results: [],
-        error: "The search succeeded but returned no results."
+        error: "The search returned no results."
       };
     }
 
     console.log(
-      `Tavily search succeeded: ${results.length} results.`
+      `Smile AI search succeeded: ${results.length} results.`
     );
 
     return {
       available: true,
-      answer: data.answer || "",
+      answer,
       results,
       error: null
     };
-
   } catch (error) {
     console.error(
-      "Tavily connection error:",
-      error.message
+      "Tavily search error:",
+      error.message || error
     );
+
+    const message = String(
+      error.message || ""
+    ).toLowerCase();
+
+    let friendlyError = "Live search is temporarily unavailable.";
+
+    if (
+      message.includes("keyless") ||
+      message.includes("rate limit") ||
+      message.includes("limit reached") ||
+      message.includes("429")
+    ) {
+      friendlyError =
+        "Tavily's shared search limit may have been reached. Try again later.";
+    } else if (
+      message.includes("401") ||
+      message.includes("unauthorized") ||
+      message.includes("api key")
+    ) {
+      friendlyError =
+        "Tavily rejected the API key. Check the Render environment settings or remove the key to test keyless mode.";
+    } else if (
+      message.includes("timeout") ||
+      message.includes("timed out")
+    ) {
+      friendlyError = "The live search took too long. Try again.";
+    }
 
     return {
       available: false,
       answer: "",
       results: [],
-      error: error.name === "TimeoutError"
-        ? "Tavily search timed out."
-        : "Could not connect to Tavily."
+      error: friendlyError
     };
   }
 }
@@ -217,9 +219,6 @@ async function searchWeb(query) {
 // ==========================================
 // DIRECT SEARCH TEST
 // ==========================================
-
-// Open /search-test to check Tavily independently
-// of Gemini and the frontend.
 
 app.get("/search-test", async (req, res) => {
   const query =
@@ -235,7 +234,6 @@ app.get("/search-test", async (req, res) => {
     resultCount: result.results.length,
     answer: result.answer || null,
     error: result.error || null,
-
     results: result.results.map((item) => ({
       title: item.title,
       url: item.url,
@@ -250,7 +248,6 @@ app.get("/search-test", async (req, res) => {
 
 app.post("/chat", async (req, res) => {
   try {
-
     // --------------------------------------
     // CHECK GEMINI
     // --------------------------------------
@@ -262,11 +259,7 @@ app.post("/chat", async (req, res) => {
       });
     }
 
-    const {
-      message,
-      history,
-      search
-    } = req.body || {};
+    const { message, history, search } = req.body || {};
 
     if (
       typeof message !== "string" ||
@@ -302,10 +295,8 @@ app.post("/chat", async (req, res) => {
         });
       }
 
-      const {
-        data,
-        error
-      } = await supabase.auth.getUser(token);
+      const { data, error } =
+        await supabase.auth.getUser(token);
 
       if (error || !data.user) {
         return res.status(401).json({
@@ -326,9 +317,7 @@ app.post("/chat", async (req, res) => {
             (item) =>
               item &&
               typeof item.text === "string" &&
-              ["user", "assistant", "model"].includes(
-                item.role
-              )
+              ["user", "assistant", "model"].includes(item.role)
           )
           .slice(-12)
           .map((item) => ({
@@ -336,7 +325,6 @@ app.post("/chat", async (req, res) => {
               item.role === "assistant"
                 ? "model"
                 : item.role,
-
             parts: [
               {
                 text: item.text.slice(0, 6000)
@@ -352,12 +340,10 @@ app.post("/chat", async (req, res) => {
     const currentInformationPattern =
       /\b(latest|today|current|currently|recent|news|now|2026|2025|live|score|results|weather|price|president|coach|manager|transfer|standings|table|fixtures|schedule|who won|this season|breaking|update|updates|search the web|look up|find online|source|sources)\b/i;
 
+    // Keyless mode must also be allowed to attempt a search.
     const shouldSearch =
-      Boolean(TAVILY_API_KEY) &&
-      (
-        search === true ||
-        currentInformationPattern.test(message)
-      );
+      search === true ||
+      currentInformationPattern.test(message);
 
     let searchData = {
       available: false,
@@ -377,21 +363,18 @@ app.post("/chat", async (req, res) => {
     let prompt = message.trim();
 
     if (searchData.available) {
-
       const searchContext = [
         "LIVE WEB SEARCH RESULTS",
         "",
         searchData.answer
           ? `Search summary: ${searchData.answer}`
           : "",
-
         ...searchData.results.map(
           (item, index) =>
             `${index + 1}. ${item.title}\n` +
             `URL: ${item.url}\n` +
             `Information: ${item.content}`
         ),
-
         "",
         "Instructions:",
         "- Answer using the search results.",
@@ -407,18 +390,14 @@ app.post("/chat", async (req, res) => {
       prompt =
         `${searchContext}\n\n` +
         `USER QUESTION:\n${message.trim()}`;
-
     } else if (shouldSearch) {
-
-      // Do not allow the model to pretend a search worked.
-
       prompt =
         "IMPORTANT: A live web search was attempted but failed. " +
-        "You do not have verified live search results for this " +
-        "question. Do not invent sources, claim you searched " +
-        "successfully, or present unverified current facts as " +
-        "confirmed. Explain that live search is temporarily " +
-        "unavailable and offer general information only if useful.\n\n" +
+        "You do not have verified live search results for this question. " +
+        "Do not invent sources, claim you searched successfully, " +
+        "or present unverified current facts as confirmed. " +
+        "Explain that live search is temporarily unavailable. " +
+        "Offer general information only if useful.\n\n" +
         `USER QUESTION:\n${message.trim()}`;
     }
 
@@ -428,13 +407,10 @@ app.post("/chat", async (req, res) => {
 
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-
       contents: [
         ...safeHistory,
-
         {
           role: "user",
-
           parts: [
             {
               text: prompt
@@ -442,7 +418,6 @@ app.post("/chat", async (req, res) => {
           ]
         }
       ],
-
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.8,
@@ -461,27 +436,21 @@ app.post("/chat", async (req, res) => {
     return res.json({
       reply,
       model: GEMINI_MODEL,
-
       searched: Boolean(
         shouldSearch && searchData.available
       ),
-
       searchResults: searchData.available
         ? searchData.results.map((item) => ({
             title: item.title,
             url: item.url
           }))
         : [],
-
       searchError: shouldSearch
         ? searchData.error
         : null,
-
       authenticated: Boolean(authenticatedUser)
     });
-
   } catch (error) {
-
     console.error("Smile AI chat error:", error);
 
     const errorMessage = String(
@@ -530,20 +499,14 @@ app.post("/chat", async (req, res) => {
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Smile AI is running on port ${PORT}`);
-
   console.log(`Model: ${GEMINI_MODEL}`);
-
-  console.log(
-    `Gemini configured: ${Boolean(GEMINI_API_KEY)}`
-  );
-
+  console.log(`Gemini configured: ${Boolean(GEMINI_API_KEY)}`);
   console.log(
     `Supabase configured: ${Boolean(
       SUPABASE_URL && SUPABASE_ANON_KEY
     )}`
   );
-
   console.log(
-    `Tavily configured: ${Boolean(TAVILY_API_KEY)}`
+    `Tavily mode: ${TAVILY_API_KEY ? "API key" : "keyless"}`
   );
 });
